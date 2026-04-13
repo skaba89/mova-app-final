@@ -30,8 +30,11 @@ FROM node:20-bookworm-slim AS production
 
 WORKDIR /app
 
-# Install dumb-init for signal handling + SQLite3
-RUN apt-get update && apt-get install -y --no-install-recommends dumb-init wget sqlite3 su-exec && rm -rf /var/lib/apt/lists/*
+# Install runtime dependencies: OpenSSL (required by Prisma), SQLite3, dumb-init, su-exec
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    openssl libssl3 \
+    dumb-init wget sqlite3 su-exec \
+    && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
 RUN groupadd -r mova && useradd -r -g mova -d /app mova
