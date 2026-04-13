@@ -49,6 +49,7 @@ function generateOTP(): string {
 export async function GET(request: NextRequest) {
   try {
     const auth = await requireAuth(request);
+    if (auth instanceof NextResponse) return auth;
     const { searchParams } = new URL(request.url);
 
     const status = searchParams.get('status');
@@ -128,6 +129,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const auth = await requireAuth(request);
+    if (auth instanceof NextResponse) return auth;
     const body = await request.json();
 
     const parsed = createRideSchema.safeParse(body);

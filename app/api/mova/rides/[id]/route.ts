@@ -11,6 +11,9 @@ const updateRideSchema = z.object({
     'completed',
     'cancelled',
     'passenger_cancelled',
+    'driver_cancelled',
+    'no_show',
+    'refunded',
   ]).optional(),
   driverNote: z.string().max(500).optional(),
   passengerNote: z.string().max(500).optional(),
@@ -45,6 +48,7 @@ export async function GET(
 ) {
   try {
     const auth = await requireAuth(request);
+    if (auth instanceof NextResponse) return auth;
     const { id } = await params;
 
     const ride = await db.ride.findUnique({
@@ -126,6 +130,7 @@ export async function PATCH(
 ) {
   try {
     const auth = await requireAuth(request);
+    if (auth instanceof NextResponse) return auth;
     const { id } = await params;
     const body = await request.json();
 
@@ -173,11 +178,11 @@ export async function PATCH(
       updateData.passengerNote = data.passengerNote;
     }
 
-    // Transitions de statut
+    // Transitions de statut avec controle de role
     if (data.status) {
       const newStatus = data.status;
 
-      // accepte : attribution du chauffeur
+      // accepted : attribution du chauffeur (chauffeur uniquement)
       if (newStatus === 'accepted') {
         if (existingRide.status !== 'requested') {
           return NextResponse.json(
@@ -185,12 +190,18 @@ export async function PATCH(
             { status: 400 }
           );
         }
+        if (!isDriver && !isAdmin) {
+          return NextResponse.json(
+            { success: false, error: 'Seul un chauffeur peut accepter une course' },
+            { status: 403 }
+          );
+        }
         updateData.driverId = auth.id;
         updateData.status = 'accepted';
         updateData.acceptedAt = new Date();
       }
 
-      // arrive : le chauffeur est arrive au point de depart
+      // arrive : le chauffeur est arrive au point de depart (chauffeur uniquement)
       else if (newStatus === 'arrived') {
         if (existingRide.status !== 'accepted') {
           return NextResponse.json(
@@ -198,11 +209,17 @@ export async function PATCH(
             { status: 400 }
           );
         }
+        if (!isDriver && !isAdmin) {
+          return NextResponse.json(
+            { success: false, error: 'Seul le chauffeur peut signaler son arrivee' },
+            { status: 403 }
+          );
+        }
         updateData.status = 'arrived';
         updateData.arrivedAt = new Date();
       }
 
-      // en cours : debut de la course
+      // en cours : debut de la course (chauffeur uniquement)
       else if (newStatus === 'in_progress') {
         if (existingRide.status !== 'arrived') {
           return NextResponse.json(
@@ -216,16 +233,28 @@ export async function PATCH(
             { status: 400 }
           );
         }
+        if (!isDriver && !isAdmin) {
+          return NextResponse.json(
+            { success: false, error: 'Seul le chauffeur peut demarrer la course' },
+            { status: 403 }
+          );
+        }
         updateData.status = 'in_progress';
         updateData.startedAt = new Date();
       }
 
-      // terminee : fin de la course
+      // terminee : fin de la course (chauffeur ou admin)
       else if (newStatus === 'completed') {
         if (existingRide.status !== 'in_progress') {
           return NextResponse.json(
             { success: false, error: 'La course doit etre en cours pour etre terminee' },
             { status: 400 }
+          );
+        }
+        if (!isDriver && !isAdmin) {
+          return NextResponse.json(
+            { success: false, error: 'Seul le chauffeur ou un admin peut terminer la course' },
+            { status: 403 }
           );
         }
         updateData.status = 'completed';
@@ -238,27 +267,88 @@ export async function PATCH(
 
         if (!existingPayment) {
           const finalFare = existingRide.estimatedFare;
-          await db.payment.create({
-            data: {
-              rideId: id,
-              amount: finalFare,
-              method: existingRide.paymentMethod,
-              status: 'pending',
-            },
-          });
           updateData.finalFare = finalFare;
+
+          // Si paiement par wallet, debiter le portefeuille
+          if (existingRide.paymentMethod === 'wallet') {
+            const wallet = await db.wallet.findUnique({
+              where: { userId: existingRide.passengerId },
+            });
+            if (wallet && Number(wallet.balance) >= Number(finalFare)) {
+              await db.$transaction([
+                db.payment.create({
+                  data: {
+                    userId: existingRide.passengerId,
+                    rideId: id,
+                    amount: finalFare,
+                    method: 'wallet',
+                    status: 'completed',
+                    reference: `PAY-RIDE-${Date.now()}`,
+                    description: `Course #${id.slice(-8).toUpperCase()}`,
+                  },
+                }),
+                db.wallet.update({
+                  where: { userId: existingRide.passengerId },
+                  data: { balance: { decrement: finalFare } },
+                }),
+                db.walletTransaction.create({
+                  data: {
+                    walletId: wallet.id,
+                    type: 'debit',
+                    amount: Number(finalFare),
+                    method: 'wallet',
+                    description: `Course #${id.slice(-8).toUpperCase()}`,
+                    status: 'completed',
+                  },
+                }),
+              ]);
+              updateData.paymentStatus = 'completed';
+            } else {
+              // Solde insuffisant : paiement en attente
+              updateData.finalFare = finalFare;
+              await db.payment.create({
+                data: {
+                  userId: existingRide.passengerId,
+                  rideId: id,
+                  amount: finalFare,
+                  method: 'wallet',
+                  status: 'failed',
+                  reference: `PAY-RIDE-${Date.now()}`,
+                  description: `Course #${id.slice(-8).toUpperCase()} - solde insuffisant`,
+                },
+              });
+            }
+          } else {
+            await db.payment.create({
+              data: {
+                userId: existingRide.passengerId,
+                rideId: id,
+                amount: finalFare,
+                method: existingRide.paymentMethod,
+                status: 'pending',
+                reference: `PAY-RIDE-${Date.now()}`,
+                description: `Course #${id.slice(-8).toUpperCase()}`,
+              },
+            });
+          }
         }
       }
 
       // annulee par le chauffeur
-      else if (newStatus === 'cancelled') {
+      else if (newStatus === 'cancelled' || newStatus === 'driver_cancelled') {
         if (!['requested', 'accepted'].includes(existingRide.status)) {
           return NextResponse.json(
-            { success: false, error: 'Cette course ne peut plus etre annulee' },
+            { success: false, error: 'Cette course ne peut plus etre annulee par le chauffeur' },
             { status: 400 }
           );
         }
-        updateData.status = 'cancelled';
+        if (!isDriver && !isAdmin) {
+          return NextResponse.json(
+            { success: false, error: 'Seul le chauffeur peut annuler sa course' },
+            { status: 403 }
+          );
+        }
+        updateData.status = newStatus;
         updateData.cancelledAt = new Date();
       }
 
@@ -270,8 +360,72 @@ export async function PATCH(
             { status: 400 }
           );
         }
+        if (!isPassenger && !isAdmin) {
+          return NextResponse.json(
+            { success: false, error: 'Seul le passager peut annuler sa course' },
+            { status: 403 }
+          );
+        }
         updateData.status = 'passenger_cancelled';
         updateData.cancelledAt = new Date();
+      }
+
+      // client absent (chauffeur)
+      else if (newStatus === 'no_show') {
+        if (existingRide.status !== 'accepted' && existingRide.status !== 'arrived') {
+          return NextResponse.json(
+            { success: false, error: 'no_show uniquement possible depuis accepted ou arrived' },
+            { status: 400 }
+          );
+        }
+        if (!isDriver && !isAdmin) {
+          return NextResponse.json(
+            { success: false, error: 'Seul le chauffeur peut signaler un no_show' },
+            { status: 403 }
+          );
+        }
+        updateData.status = 'no_show';
+        updateData.cancelledAt = new Date();
+        updateData.cancellationReason = 'client_absent';
+      }
+
+      // remboursement (admin uniquement)
+      else if (newStatus === 'refunded') {
+        if (!['completed', 'cancelled', 'passenger_cancelled', 'driver_cancelled', 'no_show'].includes(existingRide.status)) {
+          return NextResponse.json(
+            { success: false, error: 'Remboursement impossible pour ce statut' },
+            { status: 400 }
+          );
+        }
+        if (!isAdmin) {
+          return NextResponse.json(
+            { success: false, error: 'Seul un admin peut traiter un remboursement' },
+            { status: 403 }
+          );
+        }
+        updateData.status = 'refunded';
+
+        // Rembourser le portefeuille si paiement wallet
+        if (existingRide.paymentMethod === 'wallet' || existingRide.paymentStatus === 'completed') {
+          const finalFare = existingRide.finalFare ?? existingRide.estimatedFare;
+          await db.$transaction([
+            db.wallet.update({
+              where: { userId: existingRide.passengerId },
+              data: { balance: { increment: Number(finalFare) } },
+            }),
+            db.walletTransaction.create({
+              data: {
+                walletId: (await db.wallet.findUnique({ where: { userId: existingRide.passengerId } }))!.id,
+                type: 'credit',
+                amount: Number(finalFare),
+                method: 'refund',
+                description: `Remboursement course #${id.slice(-8).toUpperCase()}`,
+                status: 'completed',
+              },
+            }),
+          ]);
+          updateData.paymentStatus = 'refunded';
+        }
       }
     }
 
