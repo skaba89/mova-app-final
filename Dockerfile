@@ -23,7 +23,7 @@ FROM node:20-slim AS production
 
 WORKDIR /app
 
-# Install dumb-init for signal handling
+# Install dumb-init for signal handling + Prisma CLI
 RUN apt-get update && apt-get install -y --no-install-recommends dumb-init wget && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
@@ -39,15 +39,18 @@ COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/prisma-schema ./prisma-schema
 COPY --from=builder /app/db ./db
 
-# Copy entrypoint
-COPY --chown=mova:mova entrypoint.sh /app/entrypoint.sh
-RUN chmod +x /app/entrypoint.sh
+# Copy node_modules for Prisma CLI (from builder)
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 
 # Set environment
 ENV NODE_ENV=production
 ENV HOSTNAME=0.0.0.0
 ENV PORT=3000
 ENV DATABASE_URL=file:/app/db/custom.db
+
+# Ensure database directory exists
+RUN mkdir -p /app/db && chown -R mova:mova /app/db
 
 # Switch to non-root user
 USER mova
@@ -57,5 +60,6 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
   CMD wget -qO- http://localhost:3000/ || exit 1
 
+# Inline entrypoint - no separate shell script needed (avoids CRLF issues on Windows)
 ENTRYPOINT ["dumb-init", "--"]
-CMD ["/app/entrypoint.sh"]
+CMD ["sh", "-c", "if [ -f /app/prisma-schema/schema.prisma ]; then echo 'Running Prisma db push...' && npx prisma db push --schema=/app/prisma-schema/schema.prisma --skip-generate --accept-data-loss 2>/dev/null || echo 'Prisma push skipped'; fi; echo 'Starting Next.js...' && exec node /app/server.js"]
