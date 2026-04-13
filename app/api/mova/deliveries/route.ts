@@ -47,7 +47,12 @@ export async function GET(request: NextRequest) {
 
     const where: Record<string, unknown> = { customerId: auth.id }
     if (status) {
-      where.status = status
+      const statuses = status.split(',').map(s => s.trim()).filter(Boolean)
+      if (statuses.length === 1) {
+        where.status = statuses[0]
+      } else if (statuses.length > 1) {
+        where.status = { in: statuses }
+      }
     }
 
     const [deliveries, total] = await Promise.all([

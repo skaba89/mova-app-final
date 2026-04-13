@@ -33,9 +33,30 @@ export async function GET(request: NextRequest) {
 
     const where: Record<string, unknown> = {}
 
-    if (status) where.status = status
-    if (severity) where.severity = severity
-    if (type) where.type = type
+    if (status) {
+      const statuses = status.split(',').map(s => s.trim()).filter(Boolean)
+      if (statuses.length === 1) {
+        where.status = statuses[0]
+      } else if (statuses.length > 1) {
+        where.status = { in: statuses }
+      }
+    }
+    if (severity) {
+      const severities = severity.split(',').map(s => s.trim()).filter(Boolean)
+      if (severities.length === 1) {
+        where.severity = severities[0]
+      } else if (severities.length > 1) {
+        where.severity = { in: severities }
+      }
+    }
+    if (type) {
+      const types = type.split(',').map(s => s.trim()).filter(Boolean)
+      if (types.length === 1) {
+        where.type = types[0]
+      } else if (types.length > 1) {
+        where.type = { in: types }
+      }
+    }
 
     const [incidents, total] = await Promise.all([
       db.incident.findMany({

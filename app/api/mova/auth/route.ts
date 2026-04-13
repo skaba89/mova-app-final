@@ -194,9 +194,8 @@ export async function POST(request: NextRequest) {
     }
 
     console.error('[AUTH] Erreur interne:', error);
-    const msg = error instanceof Error ? error.message : 'Erreur interne du serveur';
     return NextResponse.json(
-      { success: false, error: msg },
+      { success: false, error: 'Erreur interne du serveur' },
       { status: 500 }
     );
   }

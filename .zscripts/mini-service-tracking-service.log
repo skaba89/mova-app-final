@@ -1,0 +1,41 @@
+[tracking-service] Installing dependencies...
+bun install v1.3.12 (700fc117)
+
++ @types/node@20.19.37
++ socket.io@4.8.3
+
+22 packages installed [95.00ms]
+[tracking-service] Running bun run dev...
+$ bun --hot index.ts
+╔══════════════════════════════════════════════╗
+║   MOVA Real-Time Tracking Service            ║
+║   Running on port 3004                       ║
+║   Path: / (Caddy proxy)                     ║
+╚══════════════════════════════════════════════╝
+[stats] Drivers: 0/0 online | Passengers: 0 | Pending: 0 | Active: 0 | Zones: []
+[stats] Drivers: 0/0 online | Passengers: 0 | Pending: 0 | Active: 0 | Zones: []
+[stats] Drivers: 0/0 online | Passengers: 0 | Pending: 0 | Active: 0 | Zones: []
+[stats] Drivers: 0/0 online | Passengers: 0 | Pending: 0 | Active: 0 | Zones: []
+[stats] Drivers: 0/0 online | Passengers: 0 | Pending: 0 | Active: 0 | Zones: []
+[stats] Drivers: 0/0 online | Passengers: 0 | Pending: 0 | Active: 0 | Zones: []
+[stats] Drivers: 0/0 online | Passengers: 0 | Pending: 0 | Active: 0 | Zones: []
+[stats] Drivers: 0/0 online | Passengers: 0 | Pending: 0 | Active: 0 | Zones: []
+[stats] Drivers: 0/0 online | Passengers: 0 | Pending: 0 | Active: 0 | Zones: []
+[stats] Drivers: 0/0 online | Passengers: 0 | Pending: 0 | Active: 0 | Zones: []
+[stats] Drivers: 0/0 online | Passengers: 0 | Pending: 0 | Active: 0 | Zones: []
+[stats] Drivers: 0/0 online | Passengers: 0 | Pending: 0 | Active: 0 | Zones: []
+[stats] Drivers: 0/0 online | Passengers: 0 | Pending: 0 | Active: 0 | Zones: []
+[stats] Drivers: 0/0 online | Passengers: 0 | Pending: 0 | Active: 0 | Zones: []
+[stats] Drivers: 0/0 online | Passengers: 0 | Pending: 0 | Active: 0 | Zones: []
+[stats] Drivers: 0/0 online | Passengers: 0 | Pending: 0 | Active: 0 | Zones: []
+[stats] Drivers: 0/0 online | Passengers: 0 | Pending: 0 | Active: 0 | Zones: []
+[stats] Drivers: 0/0 online | Passengers: 0 | Pending: 0 | Active: 0 | Zones: []
+[stats] Drivers: 0/0 online | Passengers: 0 | Pending: 0 | Active: 0 | Zones: []
+[stats] Drivers: 0/0 online | Passengers: 0 | Pending: 0 | Active: 0 | Zones: []
+[stats] Drivers: 0/0 online | Passengers: 0 | Pending: 0 | Active: 0 | Zones: []
+[stats] Drivers: 0/0 online | Passengers: 0 | Pending: 0 | Active: 0 | Zones: []
+[stats] Drivers: 0/0 online | Passengers: 0 | Pending: 0 | Active: 0 | Zones: []
+[stats] Drivers: 0/0 online | Passengers: 0 | Pending: 0 | Active: 0 | Zones: []
+[stats] Drivers: 0/0 online | Passengers: 0 | Pending: 0 | Active: 0 | Zones: []
+[stats] Drivers: 0/0 online | Passengers: 0 | Pending: 0 | Active: 0 | Zones: []
+[stats] Drivers: 0/0 online | Passengers: 0 | Pending: 0 | Active: 0 | Zones: []
