@@ -191,18 +191,39 @@ export async function POST(request: NextRequest) {
         })
       }
 
-      // Verifier le streak
+      // Verifier le streak et la deduplication
       let newStreakDays = profile.streakDays
       if (action === 'daily_login') {
         const streakResult = calculateStreak(profile.lastActivityDate)
-        if (streakResult === 0) {
-          // Serie en cours, incrementer
+        if (streakResult === -1) {
+          // Meme jour : pas de double attribution
+          return NextResponse.json(
+            { success: false, error: "Bonus de connexion journaliere deja recu aujourd'hui" },
+            { status: 400 }
+          )
+        } else if (streakResult === 0) {
           newStreakDays = profile.streakDays + 1
         } else if (streakResult === 1) {
-          // Serie brisee, reinitialiser
           newStreakDays = 1
         }
-        // streakResult === -1 : meme jour, pas de changement
+      }
+
+      // Verifier la deduplication pour les actions avec relatedId
+      if (relatedId) {
+        const existingTx = await tx.loyaltyTransaction.findFirst({
+          where: {
+            loyaltyProfileId: profile.id,
+            type: 'earn',
+            description: `Points gagnes : ${action}`,
+            relatedId,
+          },
+        })
+        if (existingTx) {
+          return NextResponse.json(
+            { success: false, error: 'Points deja attribues pour cette action' },
+            { status: 400 }
+          )
+        }
       }
 
       // Calculer les nouveaux points

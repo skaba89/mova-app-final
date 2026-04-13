@@ -57,11 +57,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verification du solde suffisant
-    if (Number(fromWallet.balance) < amount) {
+    // Verifier que le portefeuille n'est pas gele
+    if (fromWallet.isFrozen) {
       return NextResponse.json(
-        { success: false, error: 'Solde insuffisant pour effectuer ce transfert' },
-        { status: 400 }
+        { success: false, error: 'Votre portefeuille est gele. Contactez le support.' },
+        { status: 403 }
       );
     }
 
@@ -100,8 +100,16 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Transaction atomique : debiter + crediter
+    // Transaction atomique : verifier solde + debiter + crediter
     const result = await db.$transaction(async (tx) => {
+      // Re-verifier le solde a l'interieur de la transaction (evite les race conditions)
+      const currentWallet = await tx.wallet.findUnique({
+        where: { id: fromWallet.id },
+      });
+      if (!currentWallet || Number(currentWallet.balance) < amount) {
+        throw new Error('Solde insuffisant pour effectuer ce transfert');
+      }
+
       // Debiter l'emetteur
       const debitedWallet = await tx.wallet.update({
         where: { id: fromWallet.id },

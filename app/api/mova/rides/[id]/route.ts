@@ -297,6 +297,8 @@ export async function PATCH(
               where: { userId: existingRide.passengerId },
             });
             if (wallet && Number(wallet.balance) >= Number(actualFare)) {
+              const payRef = `PAY-RIDE-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+              const wtRef = `WT-RIDE-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
               await db.$transaction([
                 db.payment.create({
                   data: {
@@ -305,7 +307,7 @@ export async function PATCH(
                     amount: actualFare,
                     method: 'wallet',
                     status: 'completed',
-                    reference: `PAY-RIDE-${Date.now()}`,
+                    reference: payRef,
                     description: `Course #${id.slice(-8).toUpperCase()}`,
                   },
                 }),
@@ -320,7 +322,7 @@ export async function PATCH(
                     amount: actualFare,
                     balanceBefore: wallet.balance,
                     balanceAfter: Number(wallet.balance) - Number(actualFare),
-                    reference: `WT-RIDE-${Date.now()}`,
+                    reference: wtRef,
                     description: `Course #${id.slice(-8).toUpperCase()}`,
                   },
                 }),
@@ -336,7 +338,7 @@ export async function PATCH(
                   amount: actualFare,
                   method: 'wallet',
                   status: 'failed',
-                  reference: `PAY-RIDE-${Date.now()}`,
+                  reference: `PAY-RIDE-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
                   description: `Course #${id.slice(-8).toUpperCase()} - solde insuffisant`,
                 },
               });
@@ -349,7 +351,7 @@ export async function PATCH(
                 amount: actualFare,
                 method: existingRide.paymentMethod,
                 status: 'pending',
-                reference: `PAY-RIDE-${Date.now()}`,
+                reference: `PAY-RIDE-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
                 description: `Course #${id.slice(-8).toUpperCase()}`,
               },
             });

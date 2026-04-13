@@ -75,8 +75,17 @@ export async function GET(
       )
     }
 
-    // Verifier que l'utilisateur est le proprietaire ou un admin
-    if (delivery.customerId !== auth.id && auth.role !== 'admin') {
+    // Verifier que l'utilisateur est le proprietaire, le coursier assigne ou un admin
+    const isOwner = delivery.customerId === auth.id
+    let isCourier = false
+    if (delivery.courierId) {
+      const courierProfile = await db.driverProfile.findUnique({
+        where: { id: delivery.courierId },
+        select: { userId: true },
+      })
+      isCourier = courierProfile?.userId === auth.id
+    }
+    if (!isOwner && !isCourier && auth.role !== 'admin') {
       return NextResponse.json(
         { success: false, error: 'Acces refuse' },
         { status: 403 }
@@ -155,12 +164,20 @@ export async function PATCH(
       })
       isCourier = courierProfile?.userId === auth.id
     }
+    // Pour les livraisons non assignees, verifier si l'utilisateur a un profil coursier
+    const hasCourierProfile = !isCourier ? (await db.driverProfile.findUnique({
+      where: { userId: auth.id },
+      select: { id: true },
+    })) !== null : true
     const isAdmin = auth.role === 'admin'
     if (!isCustomer && !isCourier && !isAdmin) {
-      return NextResponse.json(
-        { success: false, error: 'Acces refuse a cette livraison' },
-        { status: 403 }
-      )
+      // Autoriser les coursiers non assignes a accepter de nouvelles livraisons
+      if (!hasCourierProfile) {
+        return NextResponse.json(
+          { success: false, error: 'Acces refuse a cette livraison' },
+          { status: 403 }
+        )
+      }
     }
 
     // Verifier que la livraison n'est pas dans un etat terminal
@@ -210,7 +227,7 @@ export async function PATCH(
           { status: 400 }
         )
       }
-      if (!isCourier && !isAdmin) {
+      if (!hasCourierProfile && !isAdmin) {
         return NextResponse.json(
           { success: false, error: 'Seul un coursier peut accepter une livraison' },
           { status: 403 }

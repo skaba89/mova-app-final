@@ -99,8 +99,25 @@ export async function GET(
       )
     }
 
-    // Verifier que l'utilisateur est le proprietaire ou un admin
-    if (order.customerId !== auth.id && auth.role !== 'admin') {
+    // Verifier que l'utilisateur est le proprietaire, le restaurant, le chauffeur ou un admin
+    const isOwner = order.customerId === auth.id
+    let isDriverAccess = false
+    if (order.driverProfileId) {
+      const dp = await db.driverProfile.findUnique({
+        where: { id: order.driverProfileId },
+        select: { userId: true },
+      })
+      isDriverAccess = dp?.userId === auth.id
+    }
+    let isRestaurantAccess = false
+    if (auth.role === 'restaurant') {
+      const rest = await db.restaurant.findUnique({
+        where: { id: order.restaurantId },
+        select: { ownerId: true },
+      })
+      isRestaurantAccess = rest?.ownerId === auth.id
+    }
+    if (!isOwner && !isDriverAccess && !isRestaurantAccess && auth.role !== 'admin') {
       return NextResponse.json(
         { success: false, error: 'Acces refuse' },
         { status: 403 }
@@ -170,7 +187,12 @@ export async function PATCH(
 
     // Verification des droits : client, restaurant, chauffeur ou admin
     const isCustomer = order.customerId === auth.id
-    const isRestaurantOwner = order.restaurantId && auth.role === 'restaurant'
+    const isRestaurantOwner = auth.role === 'restaurant' && order.restaurant
+      ? (await db.restaurant.findUnique({
+          where: { id: order.restaurantId },
+          select: { ownerId: true },
+        }))?.ownerId === auth.id
+      : false
     let isDriver = false
     if (order.driverProfileId) {
       const driverProfile = await db.driverProfile.findUnique({
@@ -179,8 +201,16 @@ export async function PATCH(
       })
       isDriver = driverProfile?.userId === auth.id
     }
+    // Verifier si l'utilisateur a un profil chauffeur (pour accepter une commande)
+    let hasDriverProfile = isDriver
+    if (!hasDriverProfile) {
+      hasDriverProfile = (await db.driverProfile.findUnique({
+        where: { userId: auth.id },
+        select: { id: true },
+      })) !== null
+    }
     const isAdmin = auth.role === 'admin'
-    if (!isCustomer && !isRestaurantOwner && !isDriver && !isAdmin) {
+    if (!isCustomer && !isRestaurantOwner && !isDriver && !hasDriverProfile && !isAdmin) {
       return NextResponse.json(
         { success: false, error: 'Acces refuse a cette commande' },
         { status: 403 }
@@ -215,6 +245,13 @@ export async function PATCH(
     const isDriverTransition = ['picked_up', 'in_transit', 'delivered'].includes(status)
 
     if (isDriverTransition) {
+      // Seul un chauffeur (assigne ou avec profil) ou un admin peut effectuer ces transitions
+      if (!isDriver && !hasDriverProfile && !isAdmin) {
+        return NextResponse.json(
+          { success: false, error: 'Seul un chauffeur peut effectuer cette transition' },
+          { status: 403 }
+        )
+      }
       const allowed = DRIVER_TRANSITIONS[order.status] ?? []
       if (!allowed.includes(status)) {
         return NextResponse.json(
@@ -223,6 +260,13 @@ export async function PATCH(
         )
       }
     } else {
+      // Seul un restaurant owner ou un admin peut effectuer les transitions restaurant
+      if (!isRestaurantOwner && !isAdmin) {
+        return NextResponse.json(
+          { success: false, error: 'Seul le restaurant peut effectuer cette transition' },
+          { status: 403 }
+        )
+      }
       const allowed = RESTAURANT_TRANSITIONS[order.status] ?? []
       if (!allowed.includes(status)) {
         return NextResponse.json(

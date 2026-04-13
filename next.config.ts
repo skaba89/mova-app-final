@@ -52,17 +52,21 @@ const nextConfig: NextConfig = {
   },
 }
 
-// Enveloppe avec Sentry si le DSN est configuré
-if (process.env.SENTRY_DSN) {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { withSentryConfig } = require('@sentry/nextjs')
-  module.exports = withSentryConfig(nextConfig, {
-    silent: true,
-    hideSourceMaps: true,
-    disableLogger: true,
-  })
-} else {
-  module.exports = nextConfig
+// Enveloppe avec Sentry si le DSN est configure
+// Note: utilisation de require() conditionnel pour eviter un export dual ESM/CJS
+let finalConfig: NextConfig = nextConfig
+try {
+  if (process.env.SENTRY_DSN) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { withSentryConfig } = require('@sentry/nextjs')
+    finalConfig = withSentryConfig(nextConfig, {
+      silent: true,
+      hideSourceMaps: true,
+      disableLogger: true,
+    })
+  }
+} catch {
+  // Sentry non installe, config standard
 }
 
-export default nextConfig
+export default finalConfig

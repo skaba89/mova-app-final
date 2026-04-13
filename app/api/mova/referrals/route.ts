@@ -122,48 +122,24 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Trouver le code de parrainage (recherche exacte)
+    // Trouver le code de parrainage (recherche exacte d'abord)
     const referralRecord = await db.referral.findFirst({
       where: { code: normalizedCode },
     })
 
-    if (!referralRecord) {
-      // Essayer de trouver un utilisateur dont le code genere correspond
-      // Le code est au format MOVA-XXXXXXXX (8 premiers caracteres de l'ID)
-      if (normalizedCode.startsWith('MOVA-')) {
-        const potentialIdPart = normalizedCode.substring(5).toLowerCase()
-        const potentialReferrer = await db.user.findFirst({
-          where: {
-            id: { startsWith: potentialIdPart },
-          },
-        })
+    // Determiner l'ID du parrain
+    let referrerId: string | null = referralRecord?.referrerId ?? null
 
-        if (potentialReferrer) {
-          // Creer le parrainage
-          const referral = await db.referral.create({
-            data: {
-              referrerId: potentialReferrer.id,
-              referredId: auth.id,
-              code: normalizedCode,
-              status: 'pending',
-              bonusAmount: REFERRAL_BONUS,
-            },
-          })
+    // Si aucun referralRecord, essayer de trouver un utilisateur dont le code genere correspond
+    if (!referrerId && normalizedCode.startsWith('MOVA-')) {
+      const potentialIdPart = normalizedCode.substring(5).toLowerCase()
+      const potentialReferrer = await db.user.findFirst({
+        where: { id: { startsWith: potentialIdPart } },
+      })
+      referrerId = potentialReferrer?.id ?? null
+    }
 
-          return NextResponse.json({
-            success: true,
-            data: {
-              message: 'Code de parrainage applique avec succes',
-              referral: {
-                id: referral.id,
-                status: referral.status,
-                bonusAmount: num(referral.bonusAmount),
-              },
-            },
-          })
-        }
-      }
-
+    if (!referrerId) {
       return NextResponse.json(
         { success: false, error: 'Code de parrainage invalide' },
         { status: 404 }
@@ -171,21 +147,35 @@ export async function POST(request: NextRequest) {
     }
 
     // Verifier que le parrain n'est pas l'utilisateur lui-meme
-    if (referralRecord.referrerId === auth.id) {
+    if (referrerId === auth.id) {
       return NextResponse.json(
         { success: false, error: 'Vous ne pouvez pas utiliser votre propre code de parrainage' },
         { status: 400 }
       )
     }
 
-    // Verifier qu'un autre utilisateur n'a pas deja ete parraine avec ce code
-    // (le code peut etre utilise par plusieurs filleuls differents)
-    if (referralRecord.referredId !== auth.id) {
-      return NextResponse.json(
-        { success: false, error: 'Ce code de parrainage a deja ete utilise' },
-        { status: 400 }
-      )
-    }
+    // Creer le parrainage
+    const referral = await db.referral.create({
+      data: {
+        referrerId,
+        referredId: auth.id,
+        code: normalizedCode,
+        status: 'pending',
+        bonusAmount: REFERRAL_BONUS,
+      },
+    })
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        message: 'Code de parrainage applique avec succes',
+        referral: {
+          id: referral.id,
+          status: referral.status,
+          bonusAmount: num(referral.bonusAmount),
+        },
+      },
+    })
   } catch (error) {
     console.error('[REFERRALS] Erreur lors de l\'application:', error)
     return NextResponse.json(
