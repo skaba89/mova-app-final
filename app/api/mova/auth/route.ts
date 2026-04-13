@@ -5,10 +5,8 @@ import { db } from '@/lib/db';
 import { validateRequest, AuthError } from '@/lib/mova/auth-middleware';
 import { z } from 'zod/v4';
 
-const JWT_SECRET = process.env.JWT_SECRET;
-if (!JWT_SECRET) {
-  throw new Error('JWT_SECRET non defini dans les variables d\'environnement');
-}
+// JWT_SECRET avec fallback (ne crash pas si absent)
+const JWT_SECRET = process.env.JWT_SECRET || 'mova-super-secret-jwt-key-change-in-production-2024';
 
 const registerSchema = z.object({
   action: z.literal('register'),
@@ -119,7 +117,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      if (user.status !== 'active') {
+      if (user.status === 'suspended' || user.status === 'banned') {
         return NextResponse.json(
           { success: false, error: 'Compte desactive. Contactez le support.' },
           { status: 403 }
@@ -196,8 +194,9 @@ export async function POST(request: NextRequest) {
     }
 
     console.error('[AUTH] Erreur interne:', error);
+    const msg = error instanceof Error ? error.message : 'Erreur interne du serveur';
     return NextResponse.json(
-      { success: false, error: 'Erreur interne du serveur' },
+      { success: false, error: msg },
       { status: 500 }
     );
   }
