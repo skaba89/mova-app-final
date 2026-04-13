@@ -7,6 +7,10 @@ import { RidesView } from '@/components/mova/rides-view'
 import { WalletView } from '@/components/mova/wallet-view'
 import { NotificationsView } from '@/components/mova/notifications-view'
 import { ProfileView } from '@/components/mova/profile-view'
+import { FoodView } from '@/components/mova/food-view'
+import { RestaurantView } from '@/components/mova/restaurant-view'
+import { FoodCartView } from '@/components/mova/foodcart-view'
+import { FoodTrackingView } from '@/components/mova/foodtracking-view'
 import { Construction, ArrowLeft } from 'lucide-react'
 
 /**
@@ -74,18 +78,18 @@ export default function MovaPage() {
     case 'profile':
       return <ProfileView />
 
-    // --- Vues a venir (placeholder) ---
+    // --- Vues Food ---
     case 'food':
-      return <PlaceholderView viewName="Food" />
+      return <FoodView />
 
     case 'restaurant':
-      return <PlaceholderView viewName="Restaurant" />
+      return <RestaurantView />
 
     case 'foodcart':
-      return <PlaceholderView viewName="Panier alimentaire" />
+      return <FoodCartView />
 
     case 'foodtracking':
-      return <PlaceholderView viewName="Suivi de commande" />
+      return <FoodTrackingView />
 
     case 'deliveries':
       return <PlaceholderView viewName="Livraison" />
