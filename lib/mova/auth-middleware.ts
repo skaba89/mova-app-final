@@ -65,7 +65,7 @@ export async function validateRequest(request: NextRequest): Promise<ValidationR
     const { payload } = await jwtVerify(token, secret)
 
     const user: AuthUser = {
-      id: payload.sub as string,
+      id: (payload.sub ?? payload.id) as string,
       email: payload.email as string,
       role: payload.role as UserRole,
     }

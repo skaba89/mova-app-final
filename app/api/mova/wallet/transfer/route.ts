@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (toUser.status !== 'active') {
+    if (toUser.status === 'suspended' || toUser.status === 'banned') {
       return NextResponse.json(
         { success: false, error: 'Le destinataire a un compte desactive' },
         { status: 400 }

@@ -400,6 +400,8 @@ model Ride {
   passengerNote      String?
   driverNote         String?
   otp                String?
+  acceptedAt         DateTime?
+  arrivedAt          DateTime?
   scheduledAt        DateTime?
   cancelledAt        DateTime?
   cancellationReason String?

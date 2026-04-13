@@ -54,7 +54,7 @@ export async function logAction(params: LogActionParams): Promise<void> {
         resource: params.resource,
         resourceId: params.resourceId ?? null,
         severity: params.severity ?? 'info',
-        ...(params.details ? { details: JSON.stringify(params.details) } : {}),
+        ...(params.details ? { details: params.details } : {}),
       },
     })
   } catch (error) {
@@ -90,8 +90,8 @@ export async function getAuditLogs(
   const where: Record<string, unknown> = {}
 
   if (userId) where.userId = userId
-  if (action) where.action = { contains: action, mode: 'insensitive' }
-  if (resource) where.resource = { contains: resource, mode: 'insensitive' }
+  if (action) where.action = { contains: action }
+  if (resource) where.resource = { contains: resource }
   if (severity) where.severity = severity
 
   if (dateFrom || dateTo) {

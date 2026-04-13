@@ -186,7 +186,7 @@ export async function POST(request: NextRequest) {
           customerId: auth.id,
           restaurantId: data.restaurantId,
           status: 'pending',
-          items: JSON.stringify(orderItems),
+          items: orderItems,
           subtotal,
           deliveryFee,
           serviceFee,

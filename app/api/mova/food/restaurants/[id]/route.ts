@@ -15,7 +15,7 @@ export async function GET(
   try {
     const { id } = await params
 
-    const restaurant = await db.restaurant.findUnique({
+    const restaurant = await db.restaurant.findFirst({
       where: { id, isActive: true },
       include: {
         menuItems: {
