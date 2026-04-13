@@ -11,7 +11,7 @@ COPY . .
 RUN bunx prisma generate --schema=prisma-schema/schema.prisma
 
 RUN mkdir -p /app/db && \
-    DATABASE_URL="file:./db/custom.db" \
+    DATABASE_URL="file:/app/db/custom.db" \
     bunx prisma db push --schema=prisma-schema/schema.prisma --skip-generate --accept-data-loss 2>&1 && \
     echo "=== DB tables created ==="
 
@@ -38,8 +38,8 @@ RUN mkdir -p /app/db /app/db-template
 ENV NODE_ENV=production
 ENV HOSTNAME=0.0.0.0
 ENV PORT=3000
-ENV DATABASE_URL=file:./db/custom.db
-ENV JWT_SECRET=mova-super-secret-jwt-key-change-in-production-2024
+ENV DATABASE_URL=file:/app/db/custom.db
+ENV JWT_SECRET=mova-super-secret-key-2024
 
 EXPOSE 3000
 

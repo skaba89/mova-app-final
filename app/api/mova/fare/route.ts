@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const validVehicleTypes = ['moto', 'auto', 'van', 'premium'];
+    const validVehicleTypes = ['moto', 'auto', 'van', 'premium', 'standard', 'bicycle', 'camion', 'pickup', 'clando', 'taxi', 'livraison', 'bus'];
     if (!validVehicleTypes.includes(vehicleType)) {
       return NextResponse.json(
         { success: false, error: 'Type de vehicule invalide' },

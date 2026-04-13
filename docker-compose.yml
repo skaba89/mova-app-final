@@ -9,10 +9,10 @@ services:
       - "3000:3000"
     environment:
       - NODE_ENV=production
-      - DATABASE_URL=file:./db/custom.db
+      - DATABASE_URL=file:/app/db/custom.db
       - HOSTNAME=0.0.0.0
       - PORT=3000
-      - JWT_SECRET=mova-super-secret-jwt-key-change-in-production-2024
+      - JWT_SECRET=mova-super-secret-key-2024
     volumes:
       - mova-db:/app/db
     healthcheck:
