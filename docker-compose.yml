@@ -9,15 +9,14 @@ services:
       - "3000:3000"
     environment:
       - NODE_ENV=production
-      - DATABASE_URL=file:/app/db/custom.db
+      - DATABASE_URL=file:./db/custom.db
       - HOSTNAME=0.0.0.0
       - PORT=3000
       - JWT_SECRET=mova-super-secret-jwt-key-change-in-production-2024
     volumes:
-      # Persist the SQLite database
       - mova-db:/app/db
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3000/"]
+      test: ["CMD", "curl", "-sf", "http://localhost:3000/"]
       interval: 30s
       timeout: 10s
       retries: 3
