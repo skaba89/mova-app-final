@@ -10,8 +10,8 @@ RUN bun install --frozen-lockfile
 # Copy source
 COPY . .
 
-# Generate Prisma client
-RUN bunx prisma generate
+# Generate Prisma client (use prisma-schema directory)
+RUN bunx prisma generate --schema=prisma-schema/schema.prisma
 
 # Build Next.js (standalone mode)
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -36,6 +36,7 @@ COPY --from=builder /app/public ./public
 
 # Copy Prisma schema & DB for migrations
 COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/prisma-schema ./prisma-schema
 COPY --from=builder /app/db ./db
 
 # Copy entrypoint

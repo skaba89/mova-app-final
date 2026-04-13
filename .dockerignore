@@ -1,0 +1,14 @@
+node_modules
+.next
+.git
+.gitignore
+examples
+mini-services
+skills
+test
+prompt
+claude
+download
+*.md
+.vscode
+.idea
