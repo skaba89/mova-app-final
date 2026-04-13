@@ -6,6 +6,7 @@ import { requireAuth, AuthError } from '@/lib/mova/auth-middleware';
 export async function POST(request: NextRequest) {
   try {
     const auth = await requireAuth(request);
+    if (auth instanceof NextResponse) return auth;
 
     const result = await db.notification.updateMany({
       where: {

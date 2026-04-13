@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/mova/auth-middleware'
 import db from '@/lib/db'
 import { z } from 'zod/v4'
+import { LoyaltyTier } from '@prisma/client'
 
 // Schema de validation pour l'acquisition de points
 const earnPointsSchema = z.object({
@@ -29,11 +30,11 @@ const TIER_THRESHOLDS = [
 ]
 
 // Determiner le niveau de fidelite selon les points
-function determineTier(points: number): string {
-  let currentTier = 'bronze'
+function determineTier(points: number): LoyaltyTier {
+  let currentTier: LoyaltyTier = 'bronze'
   for (const { tier, minPoints } of TIER_THRESHOLDS) {
     if (points >= minPoints) {
-      currentTier = tier
+      currentTier = tier as LoyaltyTier
     }
   }
   return currentTier

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { jwtVerify } from 'jose'
 
 // Types d'utilisateurs autorises
-export type UserRole = 'admin' | 'driver' | 'user' | 'vendor' | 'operator'
+export type UserRole = 'admin' | 'chauffeur' | 'client' | 'restaurant' | 'commercant' | 'gestionnaire_flotte' | 'support_agent' | 'operateur_validation' | 'compte_entreprise' | 'coursier'
 
 // Classe d'erreur d'authentification (utilisee par les routes API)
 export class AuthError extends Error {
@@ -132,26 +132,27 @@ export async function requireAdmin(request: NextRequest): Promise<AuthUser | Nex
 }
 
 // Verifier que l'utilisateur a l'un des roles specifies
-export async function requireRole(
-  request: NextRequest,
+export function requireRole(
   roles: UserRole[]
-): Promise<AuthUser | NextResponse> {
-  const result = await requireAuth(request)
+): (request: NextRequest) => Promise<AuthUser | NextResponse> {
+  return async (request: NextRequest): Promise<AuthUser | NextResponse> => {
+    const result = await requireAuth(request)
 
-  if (result instanceof NextResponse) {
+    if (result instanceof NextResponse) {
+      return result
+    }
+
+    if (!roles.includes(result.role)) {
+      return NextResponse.json(
+        {
+          error: 'Acces refuse : role insuffisant',
+          requiredRoles: roles,
+          currentRole: result.role,
+        },
+        { status: 403 }
+      )
+    }
+
     return result
   }
-
-  if (!roles.includes(result.role)) {
-    return NextResponse.json(
-      {
-        error: 'Acces refuse : role insuffisant',
-        requiredRoles: roles,
-        currentRole: result.role,
-      },
-      { status: 403 }
-    )
-  }
-
-  return result
 }

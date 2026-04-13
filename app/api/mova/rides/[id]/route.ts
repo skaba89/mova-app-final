@@ -25,12 +25,12 @@ function convertRideDecimals(ride: Record<string, unknown>): Record<string, unkn
   const converted = { ...ride };
   const decimalFields = [
     'estimatedFare',
-    'finalFare',
+    'actualFare',
     'pickupLat',
     'pickupLng',
     'dropoffLat',
     'dropoffLng',
-    'driverRating',
+    'rating',
     'passengerRating',
   ];
   for (const field of decimalFields) {
@@ -61,24 +61,20 @@ export async function GET(
             phone: true,
           },
         },
-        driver: {
+        driverProfile: {
           select: {
             id: true,
-            name: true,
-            phone: true,
-            rating: true,
-            vehicle: {
+            user: {
               select: {
-                plateNumber: true,
-                vehicleType: true,
-                color: true,
-                brand: true,
-                model: true,
+                id: true,
+                name: true,
+                phone: true,
               },
             },
+            rating: true,
           },
         },
-        payment: true,
+        payments: true,
       },
     });
 
@@ -91,7 +87,7 @@ export async function GET(
 
     // Verification des droits : passager, chauffeur ou admin
     const isPassenger = ride.passengerId === auth.id;
-    const isDriver = ride.driverId === auth.id;
+    const isDriver = ride.driverProfileId === auth.id;
     const isAdmin = auth.role === 'admin';
 
     if (!isPassenger && !isDriver && !isAdmin) {
@@ -158,7 +154,7 @@ export async function PATCH(
 
     // Verification des droits
     const isPassenger = existingRide.passengerId === auth.id;
-    const isDriver = existingRide.driverId === auth.id;
+    const isDriver = existingRide.driverProfileId === auth.id;
     const isAdmin = auth.role === 'admin';
 
     if (!isPassenger && !isDriver && !isAdmin) {
@@ -196,7 +192,7 @@ export async function PATCH(
             { status: 403 }
           );
         }
-        updateData.driverId = auth.id;
+        updateData.driverProfileId = auth.id;
         updateData.status = 'accepted';
         updateData.acceptedAt = new Date();
       }
@@ -261,26 +257,26 @@ export async function PATCH(
         updateData.completedAt = new Date();
 
         // Creation du paiement si ce n'est pas deja fait
-        const existingPayment = await db.payment.findUnique({
+        const existingPayment = await db.payment.findFirst({
           where: { rideId: id },
         });
 
         if (!existingPayment) {
-          const finalFare = existingRide.estimatedFare;
-          updateData.finalFare = finalFare;
+          const actualFare = existingRide.estimatedFare;
+          updateData.actualFare = actualFare;
 
           // Si paiement par wallet, debiter le portefeuille
           if (existingRide.paymentMethod === 'wallet') {
             const wallet = await db.wallet.findUnique({
               where: { userId: existingRide.passengerId },
             });
-            if (wallet && Number(wallet.balance) >= Number(finalFare)) {
+            if (wallet && Number(wallet.balance) >= Number(actualFare)) {
               await db.$transaction([
                 db.payment.create({
                   data: {
                     userId: existingRide.passengerId,
                     rideId: id,
-                    amount: finalFare,
+                    amount: actualFare,
                     method: 'wallet',
                     status: 'completed',
                     reference: `PAY-RIDE-${Date.now()}`,
@@ -289,28 +285,29 @@ export async function PATCH(
                 }),
                 db.wallet.update({
                   where: { userId: existingRide.passengerId },
-                  data: { balance: { decrement: finalFare } },
+                  data: { balance: { decrement: actualFare } },
                 }),
                 db.walletTransaction.create({
                   data: {
                     walletId: wallet.id,
-                    type: 'debit',
-                    amount: Number(finalFare),
-                    method: 'wallet',
+                    type: 'ride_payment',
+                    amount: actualFare,
+                    balanceBefore: wallet.balance,
+                    balanceAfter: Number(wallet.balance) - Number(actualFare),
+                    reference: `WT-RIDE-${Date.now()}`,
                     description: `Course #${id.slice(-8).toUpperCase()}`,
-                    status: 'completed',
                   },
                 }),
               ]);
               updateData.paymentStatus = 'completed';
             } else {
               // Solde insuffisant : paiement en attente
-              updateData.finalFare = finalFare;
+              updateData.actualFare = actualFare;
               await db.payment.create({
                 data: {
                   userId: existingRide.passengerId,
                   rideId: id,
-                  amount: finalFare,
+                  amount: actualFare,
                   method: 'wallet',
                   status: 'failed',
                   reference: `PAY-RIDE-${Date.now()}`,
@@ -323,7 +320,7 @@ export async function PATCH(
               data: {
                 userId: existingRide.passengerId,
                 rideId: id,
-                amount: finalFare,
+                amount: actualFare,
                 method: existingRide.paymentMethod,
                 status: 'pending',
                 reference: `PAY-RIDE-${Date.now()}`,
@@ -407,23 +404,27 @@ export async function PATCH(
 
         // Rembourser le portefeuille si paiement wallet
         if (existingRide.paymentMethod === 'wallet' || existingRide.paymentStatus === 'completed') {
-          const finalFare = existingRide.finalFare ?? existingRide.estimatedFare;
+          const actualFare = existingRide.actualFare ?? existingRide.estimatedFare;
+          const refundWallet = await db.wallet.findUnique({ where: { userId: existingRide.passengerId } });
+          if (refundWallet) {
           await db.$transaction([
             db.wallet.update({
               where: { userId: existingRide.passengerId },
-              data: { balance: { increment: Number(finalFare) } },
+              data: { balance: { increment: Number(actualFare) } },
             }),
             db.walletTransaction.create({
               data: {
-                walletId: (await db.wallet.findUnique({ where: { userId: existingRide.passengerId } }))!.id,
-                type: 'credit',
-                amount: Number(finalFare),
-                method: 'refund',
+                walletId: refundWallet.id,
+                type: 'refund',
+                amount: actualFare,
+                balanceBefore: refundWallet.balance,
+                balanceAfter: Number(refundWallet.balance) + Number(actualFare),
+                reference: `WT-REFUND-${Date.now()}`,
                 description: `Remboursement course #${id.slice(-8).toUpperCase()}`,
-                status: 'completed',
               },
             }),
           ]);
+          }
           updateData.paymentStatus = 'refunded';
         }
       }
@@ -437,16 +438,20 @@ export async function PATCH(
         passenger: {
           select: { id: true, name: true, phone: true },
         },
-        driver: {
+        driverProfile: {
           select: {
             id: true,
-            name: true,
-            phone: true,
+            user: {
+              select: {
+                id: true,
+                name: true,
+                phone: true,
+              },
+            },
             rating: true,
-            vehicle: true,
           },
         },
-        payment: true,
+        payments: true,
       },
     });
 

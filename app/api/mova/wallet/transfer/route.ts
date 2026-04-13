@@ -23,6 +23,7 @@ function convertDecimalFields(obj: Record<string, unknown>, fields: string[]): R
 export async function POST(request: NextRequest) {
   try {
     const auth = await requireAuth(request);
+    if (auth instanceof NextResponse) return auth;
     const body = await request.json();
 
     const parsed = transferSchema.safeParse(body);
@@ -67,7 +68,7 @@ export async function POST(request: NextRequest) {
     // Verification de l'existence du destinataire
     const toUser = await db.user.findUnique({
       where: { id: toUserId },
-      select: { id: true, name: true, isActive: true },
+      select: { id: true, name: true, status: true },
     });
 
     if (!toUser) {
@@ -77,7 +78,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!toUser.isActive) {
+    if (toUser.status !== 'active') {
       return NextResponse.json(
         { success: false, error: 'Le destinataire a un compte desactive' },
         { status: 400 }
@@ -117,11 +118,12 @@ export async function POST(request: NextRequest) {
       const debitTransaction = await tx.walletTransaction.create({
         data: {
           walletId: fromWallet.id,
-          type: 'debit',
+          type: 'transfer_out',
           amount,
-          method: 'transfer',
+          balanceBefore: fromWallet.balance,
+          balanceAfter: Number(fromWallet.balance) - amount,
+          reference: `WT-OUT-${Date.now()}`,
           description: `Transfert a ${toUser.name}`,
-          status: 'completed',
         },
       });
 
@@ -129,11 +131,12 @@ export async function POST(request: NextRequest) {
       const creditTransaction = await tx.walletTransaction.create({
         data: {
           walletId: toWallet.id,
-          type: 'credit',
+          type: 'transfer_in',
           amount,
-          method: 'transfer',
+          balanceBefore: toWallet.balance,
+          balanceAfter: Number(toWallet.balance) + amount,
+          reference: `WT-IN-${Date.now()}`,
           description: `Transfert recu`,
-          status: 'completed',
         },
       });
 

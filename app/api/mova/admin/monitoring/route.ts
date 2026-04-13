@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Statistiques du limiteur de debit
-    let rateLimitStats = { totalChecks: 0, totalBlocked: 0, topViolators: [] }
+    let rateLimitStats: { totalChecks: number; totalBlocked: number; topViolators: { identifier: string; violationCount: number; lastViolation: number }[] } = { totalChecks: 0, totalBlocked: 0, topViolators: [] }
     try {
       const rateLimiter = (await import('@/lib/mova/rate-limit')).default
       rateLimitStats = rateLimiter.getStats()

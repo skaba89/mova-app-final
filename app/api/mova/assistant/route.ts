@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
     let aiResponse: string
 
     try {
-      const ZAI = (await import('z-ai-web-dev-sdk')).default
+      const { default: ZAI } = await import('z-ai-web-dev-sdk')
 
       // Construire le contexte a partir de l'historique
       const contextMessages = history.slice(-10).map((msg) => ({
@@ -82,10 +82,11 @@ export async function POST(request: NextRequest) {
         content: msg.content,
       }))
 
-      const response = await ZAI.chat({
+      const zai = await ZAI.create()
+      const response = await zai.chat.completions.create({
         messages: [
           {
-            role: 'system',
+            role: 'system' as const,
             content: `Tu es l'assistant virtuel MOVA, une super-application de mobilite pour Conakry, Guinee.
 Tu aides les utilisateurs avec les courses de vehicules, commandes alimentaires, livraisons, portefeuille et autres services MOVA.
 Reponds toujours en francais, de maniere concise et utile.
@@ -95,7 +96,7 @@ Si tu ne connais pas la reponse, indique-le clairement.`,
         ],
       })
 
-      aiResponse = typeof response === 'string' ? response : JSON.stringify(response)
+      aiResponse = response.choices?.[0]?.message?.content || 'Desole, je ne peux pas repondre pour le moment.'
     } catch (sdkError) {
       console.warn('[ASSISTANT] SDK IA indisponible, utilisation du mode basique:', sdkError)
       aiResponse = generateFallbackResponse(message)

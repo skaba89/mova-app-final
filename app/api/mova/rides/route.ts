@@ -13,8 +13,8 @@ const createRideSchema = z.object({
   dropoffLat: z.number(),
   dropoffLng: z.number(),
   dropoffZone: z.string().min(1, 'La zone d\'arrivee est requise'),
-  paymentMethod: z.enum(['wallet', 'cash', 'mobile_money']),
-  vehicleType: z.enum(['moto', 'auto', 'van', 'premium']).optional().default('auto'),
+  paymentMethod: z.enum(['wallet', 'cash', 'orange_money', 'card', 'mtn_momo', 'wave']),
+  vehicleType: z.enum(['moto', 'standard', 'van', 'premium']).optional().default('standard'),
   passengerNote: z.string().max(500).optional(),
   scheduledAt: z.string().optional(),
 });
@@ -24,12 +24,12 @@ function convertRideDecimals(ride: Record<string, unknown>): Record<string, unkn
   const converted = { ...ride };
   const decimalFields = [
     'estimatedFare',
-    'finalFare',
+    'actualFare',
     'pickupLat',
     'pickupLng',
     'dropoffLat',
     'dropoffLng',
-    'driverRating',
+    'rating',
     'passengerRating',
   ];
   for (const field of decimalFields) {
@@ -70,21 +70,17 @@ export async function GET(request: NextRequest) {
       db.ride.findMany({
         where,
         include: {
-          driver: {
+          driverProfile: {
             select: {
               id: true,
-              name: true,
-              phone: true,
-              rating: true,
-              vehicle: {
+              user: {
                 select: {
-                  plateNumber: true,
-                  vehicleType: true,
-                  color: true,
-                  brand: true,
-                  model: true,
+                  id: true,
+                  name: true,
+                  phone: true,
                 },
               },
+              rating: true,
             },
           },
         },
@@ -174,7 +170,6 @@ export async function POST(request: NextRequest) {
         dropoffLng: data.dropoffLng,
         dropoffZone: data.dropoffZone,
         paymentMethod: data.paymentMethod,
-        vehicleType: data.vehicleType,
         passengerNote: data.passengerNote ?? null,
         scheduledAt: data.scheduledAt ? new Date(data.scheduledAt) : null,
         status: 'requested',
@@ -184,13 +179,17 @@ export async function POST(request: NextRequest) {
         otp,
       },
       include: {
-        driver: {
+        driverProfile: {
           select: {
             id: true,
-            name: true,
-            phone: true,
+            user: {
+              select: {
+                id: true,
+                name: true,
+                phone: true,
+              },
+            },
             rating: true,
-            vehicle: true,
           },
         },
       },

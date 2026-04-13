@@ -1,4 +1,5 @@
 import db from '@/lib/db'
+import { Prisma } from '@prisma/client'
 
 // Types pour le journal d'audit
 export type AuditSeverity = 'info' | 'warning' | 'critical'
@@ -53,7 +54,7 @@ export async function logAction(params: LogActionParams): Promise<void> {
         resource: params.resource,
         resourceId: params.resourceId ?? null,
         severity: params.severity ?? 'info',
-        details: params.details ? JSON.stringify(params.details) : null,
+        ...(params.details ? { details: JSON.stringify(params.details) } : {}),
       },
     })
   } catch (error) {
@@ -121,7 +122,7 @@ export async function getAuditLogs(
       resource: log.resource,
       resourceId: log.resourceId,
       severity: log.severity as AuditSeverity,
-      details: log.details ? JSON.parse(log.details as string) : null,
+      details: log.details ?? null,
       ipAddress: log.ipAddress ?? null,
       userAgent: log.userAgent ?? null,
       createdAt: log.createdAt,

@@ -329,7 +329,7 @@ export function AdminMonitoringView() {
                   </div>
                   <span className="text-[10px] text-gray-500 uppercase tracking-wider">Erreurs</span>
                 </div>
-                <p className="text-2xl font-bold text-gray-800">{m.jobQueue.failed}</p>
+                <p className="text-2xl font-bold text-gray-800">{m?.jobQueue?.failed ?? 0}</p>
                 <p className="text-[10px] text-gray-400">taches echouees</p>
               </div>
             </div>
@@ -351,19 +351,19 @@ export function AdminMonitoringView() {
                   <div className="space-y-1.5">
                     <div className="flex justify-between text-xs">
                       <span className="text-gray-500">Heap utilise</span>
-                      <span className="font-semibold">{m.memory.heapUsed} Mo</span>
+                      <span className="font-semibold">{m?.memory?.heapUsed ?? 0} Mo</span>
                     </div>
                     <div className="w-full bg-gray-100 rounded-full h-2">
                       <div
                         className="h-2 rounded-full bg-purple-500 transition-all"
                         style={{
-                          width: `${Math.min((m.memory.heapUsed / m.memory.heapTotal) * 100, 100)}%`,
+                          width: `${Math.min(((m?.memory?.heapUsed ?? 0) / (m?.memory?.heapTotal ?? 1)) * 100, 100)}%`,
                         }}
                       />
                     </div>
                     <div className="flex justify-between text-[10px] text-gray-400">
-                      <span>RSS : {m.memory.rss} Mo</span>
-                      <span>Total : {m.memory.heapTotal} Mo</span>
+                      <span>RSS : {m?.memory?.rss ?? 0} Mo</span>
+                      <span>Total : {m?.memory?.heapTotal ?? 0} Mo</span>
                     </div>
                   </div>
                 </div>
@@ -377,19 +377,19 @@ export function AdminMonitoringView() {
                   <div className="space-y-1.5">
                     <div className="flex justify-between text-xs">
                       <span className="text-gray-500">Uptime</span>
-                      <span className="font-semibold">{formatUptime(m.system.uptime.seconds)}</span>
+                      <span className="font-semibold">{formatUptime(m?.system?.uptime?.seconds ?? 0)}</span>
                     </div>
                     <div className="flex justify-between text-xs">
                       <span className="text-gray-500">Runtime</span>
-                      <span className="font-semibold">{m.system.runtime}</span>
+                      <span className="font-semibold">{m?.system?.runtime ?? '--'}</span>
                     </div>
                     <div className="flex justify-between text-xs">
                       <span className="text-gray-500">Plateforme</span>
-                      <span className="font-semibold">{m.system.platform}</span>
+                      <span className="font-semibold">{m?.system?.platform ?? '--'}</span>
                     </div>
                     <div className="flex justify-between text-xs">
                       <span className="text-gray-500">Environnement</span>
-                      <span className="font-semibold">{m.system.nodeEnv}</span>
+                      <span className="font-semibold">{m?.system?.nodeEnv ?? '--'}</span>
                     </div>
                   </div>
                 </div>
@@ -429,15 +429,15 @@ export function AdminMonitoringView() {
                 <div className="space-y-1.5">
                   <div className="flex justify-between text-xs">
                     <span className="text-gray-500">Cles</span>
-                    <span className="font-semibold">{m.cache.keys}</span>
+                    <span className="font-semibold">{m?.cache?.keys ?? 0}</span>
                   </div>
                   <div className="flex justify-between text-xs">
                     <span className="text-gray-500">Taux de succes</span>
-                    <span className="font-semibold">{m.cache.hitRate}%</span>
+                    <span className="font-semibold">{m?.cache?.hitRate ?? 0}%</span>
                   </div>
                   <div className="flex justify-between text-xs">
                     <span className="text-gray-500">Requetes</span>
-                    <span className="font-semibold">{m.cache.hits + m.cache.misses}</span>
+                    <span className="font-semibold">{(m?.cache?.hits ?? 0) + (m?.cache?.misses ?? 0)}</span>
                   </div>
                 </div>
               </div>
@@ -453,11 +453,11 @@ export function AdminMonitoringView() {
                 <div className="space-y-1.5">
                   <div className="flex justify-between text-xs">
                     <span className="text-gray-500">Verifications</span>
-                    <span className="font-semibold">{m.rateLimiter.totalChecks}</span>
+                    <span className="font-semibold">{m?.rateLimiter?.totalChecks ?? 0}</span>
                   </div>
                   <div className="flex justify-between text-xs">
                     <span className="text-gray-500">Bloquees</span>
-                    <span className="font-semibold text-red-600">{m.rateLimiter.totalBlocked}</span>
+                    <span className="font-semibold text-red-600">{m?.rateLimiter?.totalBlocked ?? 0}</span>
                   </div>
                 </div>
               </div>
@@ -471,33 +471,33 @@ export function AdminMonitoringView() {
               </h2>
               <div className="grid grid-cols-4 gap-3">
                 <div className="text-center p-2 rounded-lg bg-yellow-50">
-                  <p className="text-lg font-bold text-yellow-700">{m.jobQueue.pending}</p>
+                  <p className="text-lg font-bold text-yellow-700">{m?.jobQueue?.pending ?? 0}</p>
                   <p className="text-[10px] text-gray-500">En attente</p>
                 </div>
                 <div className="text-center p-2 rounded-lg bg-blue-50">
-                  <p className="text-lg font-bold text-blue-700">{m.jobQueue.processing}</p>
+                  <p className="text-lg font-bold text-blue-700">{m?.jobQueue?.processing ?? 0}</p>
                   <p className="text-[10px] text-gray-500">En cours</p>
                 </div>
                 <div className="text-center p-2 rounded-lg bg-green-50">
-                  <p className="text-lg font-bold text-green-700">{m.jobQueue.completed}</p>
+                  <p className="text-lg font-bold text-green-700">{m?.jobQueue?.completed ?? 0}</p>
                   <p className="text-[10px] text-gray-500">Terminees</p>
                 </div>
                 <div className="text-center p-2 rounded-lg bg-red-50">
-                  <p className="text-lg font-bold text-red-600">{m.jobQueue.failed}</p>
+                  <p className="text-lg font-bold text-red-600">{m?.jobQueue?.failed ?? 0}</p>
                   <p className="text-[10px] text-gray-500">Echouees</p>
                 </div>
               </div>
             </div>
 
             {/* Top rate limit violators */}
-            {m.rateLimiter.topViolators && m.rateLimiter.topViolators.length > 0 && (
+            {m?.rateLimiter?.topViolators && m.rateLimiter.topViolators.length > 0 && (
               <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
                 <h2 className="text-sm font-semibold text-gray-700 flex items-center gap-2 mb-3">
                   <TrendingUp className="w-4 h-4 text-red-500" />
-                  Top abus de rate limit ({m.rateLimiter.topViolators.length})
+                  Top abus de rate limit ({m.rateLimiter!.topViolators.length})
                 </h2>
                 <div className="space-y-2 max-h-40 overflow-y-auto">
-                  {m.rateLimiter.topViolators.slice(0, 10).map((v, i) => (
+                  {m.rateLimiter!.topViolators.slice(0, 10).map((v, i) => (
                     <div key={i} className="flex items-center justify-between py-1.5 text-xs">
                       <span className="text-gray-700 font-mono truncate max-w-[200px]">{v.identifier}</span>
                       <div className="flex items-center gap-3 shrink-0">

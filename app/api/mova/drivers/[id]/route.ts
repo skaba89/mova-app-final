@@ -11,17 +11,6 @@ const updateDriverSchema = z.object({
   currentLocationLng: z.number().optional(),
 });
 
-/** Convertit les champs Decimal de Prisma en nombre */
-function convertDecimalFields(obj: Record<string, unknown>, fields: string[]): Record<string, unknown> {
-  const converted = { ...obj };
-  for (const field of fields) {
-    if (converted[field] !== null && converted[field] !== undefined) {
-      (converted as Record<string, unknown>)[field] = Number(converted[field]);
-    }
-  }
-  return converted;
-}
-
 // GET /api/mova/drivers/[id]
 export async function GET(
   request: NextRequest,
@@ -32,14 +21,17 @@ export async function GET(
     if (auth instanceof NextResponse) return auth;
     const { id } = await params;
 
-    const driver = await db.user.findUnique({
-      where: { id, role: 'driver' },
+    const driverProfile = await db.driverProfile.findUnique({
+      where: { id },
       include: {
-        vehicle: true,
+        user: {
+          select: { id: true, name: true, phone: true, rating: true },
+        },
+        vehicles: true,
       },
     });
 
-    if (!driver) {
+    if (!driverProfile) {
       return NextResponse.json(
         { success: false, error: 'Chauffeur non trouve' },
         { status: 404 }
@@ -50,50 +42,33 @@ export async function GET(
     const [completedRides, totalRides, averageRating] = await Promise.all([
       db.ride.count({
         where: {
-          driverId: id,
+          driverProfileId: id,
           status: 'completed',
         },
       }),
       db.ride.count({
         where: {
-          driverId: id,
+          driverProfileId: id,
         },
       }),
-      db.ride.aggregate({
+      db.rating.aggregate({
         where: {
-          driverId: id,
-          status: 'completed',
-          driverRating: { not: null },
+          toUserId: driverProfile.userId,
         },
-        _avg: { driverRating: true },
+        _avg: { score: true },
       }),
     ]);
-
-    const decimalFields = [
-      'rating',
-      'currentLocationLat',
-      'currentLocationLng',
-      'balance',
-    ];
-
-    const converted = convertDecimalFields(driver as unknown as Record<string, unknown>, decimalFields);
-    if (driver.vehicle) {
-      (converted as Record<string, unknown>).vehicle = convertDecimalFields(
-        driver.vehicle as unknown as Record<string, unknown>,
-        decimalFields
-      );
-    }
 
     return NextResponse.json({
       success: true,
       data: {
-        driver: converted,
+        driver: driverProfile,
         stats: {
           totalRides,
           completedRides,
           cancelledRides: totalRides - completedRides,
-          averageRating: averageRating._avg.driverRating
-            ? Number(averageRating._avg.driverRating)
+          averageRating: averageRating._avg.score
+            ? Number(averageRating._avg.score)
             : null,
         },
       },
@@ -138,11 +113,11 @@ export async function PATCH(
     const data = parsed.data;
 
     // Verification de l'existence du chauffeur
-    const driver = await db.user.findUnique({
-      where: { id, role: 'driver' },
+    const driverProfile = await db.driverProfile.findUnique({
+      where: { id },
     });
 
-    if (!driver) {
+    if (!driverProfile) {
       return NextResponse.json(
         { success: false, error: 'Chauffeur non trouve' },
         { status: 404 }
@@ -157,32 +132,20 @@ export async function PATCH(
     if (data.currentLocationLat !== undefined) updateData.currentLocationLat = data.currentLocationLat;
     if (data.currentLocationLng !== undefined) updateData.currentLocationLng = data.currentLocationLng;
 
-    const updatedDriver = await db.user.update({
+    const updatedDriver = await db.driverProfile.update({
       where: { id },
       data: updateData,
       include: {
-        vehicle: true,
+        user: {
+          select: { id: true, name: true, phone: true, rating: true },
+        },
+        vehicles: true,
       },
     });
 
-    const decimalFields = [
-      'rating',
-      'currentLocationLat',
-      'currentLocationLng',
-      'balance',
-    ];
-
-    const converted = convertDecimalFields(updatedDriver as unknown as Record<string, unknown>, decimalFields);
-    if (updatedDriver.vehicle) {
-      (converted as Record<string, unknown>).vehicle = convertDecimalFields(
-        updatedDriver.vehicle as unknown as Record<string, unknown>,
-        decimalFields
-      );
-    }
-
     return NextResponse.json({
       success: true,
-      data: { driver: converted },
+      data: { driver: updatedDriver },
     });
   } catch (error) {
     if (error instanceof AuthError) {

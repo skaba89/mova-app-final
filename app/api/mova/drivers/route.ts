@@ -2,17 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { requireAuth, AuthError } from '@/lib/mova/auth-middleware';
 
-/** Convertit les champs Decimal de Prisma en nombre */
-function convertDecimalFields(obj: Record<string, unknown>, fields: string[]): Record<string, unknown> {
-  const converted = { ...obj };
-  for (const field of fields) {
-    if (converted[field] !== null && converted[field] !== undefined) {
-      (converted as Record<string, unknown>)[field] = Number(converted[field]);
-    }
-  }
-  return converted;
-}
-
 // GET /api/mova/drivers
 export async function GET(request: NextRequest) {
   try {
@@ -27,7 +16,7 @@ export async function GET(request: NextRequest) {
     const limit = Math.min(50, Math.max(1, parseInt(searchParams.get('limit') ?? '20', 10)));
     const skip = (page - 1) * limit;
 
-    // Construction du filtre
+    // Construction du filtre sur DriverProfile
     const where: Record<string, unknown> = {
       isActive: true,
     };
@@ -37,58 +26,33 @@ export async function GET(request: NextRequest) {
     }
 
     if (vehicleType) {
-      where.vehicle = {
-        vehicleType,
-      };
+      where.vehicleType = vehicleType;
     }
 
     if (isOnline !== null && isOnline !== undefined && isOnline !== '') {
       where.isOnline = isOnline === 'true';
     }
 
-    const [drivers, total] = await Promise.all([
-      db.user.findMany({
-        where: {
-          role: 'driver',
-          ...where,
-        },
+    const [driverProfiles, total] = await Promise.all([
+      db.driverProfile.findMany({
+        where,
         include: {
-          vehicle: true,
+          user: {
+            select: { id: true, name: true, phone: true, rating: true },
+          },
+          vehicles: true,
         },
         orderBy: { createdAt: 'desc' },
         skip,
         take: limit,
       }),
-      db.user.count({
-        where: {
-          role: 'driver',
-          ...where,
-        },
-      }),
+      db.driverProfile.count({ where }),
     ]);
-
-    const decimalFields = [
-      'rating',
-      'currentLocationLat',
-      'currentLocationLng',
-      'balance',
-    ];
-
-    const convertedDrivers = drivers.map((driver) => {
-      const base = convertDecimalFields(driver as unknown as Record<string, unknown>, decimalFields);
-      if (driver.vehicle) {
-        (base as Record<string, unknown>).vehicle = convertDecimalFields(
-          driver.vehicle as unknown as Record<string, unknown>,
-          decimalFields
-        );
-      }
-      return base;
-    });
 
     return NextResponse.json({
       success: true,
       data: {
-        drivers: convertedDrivers,
+        drivers: driverProfiles,
         pagination: {
           page,
           limit,

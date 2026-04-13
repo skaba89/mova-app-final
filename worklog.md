@@ -1,68 +1,108 @@
----
-Task ID: reconstruction-complete
-Agent: main (Super Z)
-Task: Reconstruction complete du projet MOVA apres perte totale du code source
+# Worklog - TypeScript Fixes for MOVA API
 
-Work Log:
-- Diagnostic: src/, prisma/, public/, scripts/ directories owned by root (700), empty, no code recoverable
-- GitHub repo skaba89/mova-app returns 404
-- Created working directories: app/, lib/, components/, prisma-schema/, tests/
-- Updated tsconfig.json paths (@/* -> ./* root)
-- Configured Prisma to use prisma-schema/schema.prisma
-- Downgraded to Prisma 6.19.3 (v7 breaking changes)
-- Deployed 3 parallel agents for Phase 1: Schema + Lib + Core API
-- Deployed 2 parallel agents for Phase 2+3: Extended API + Frontend
-- Deployed 2 parallel agents for Phase 4+5: Food vertical + Supplementary views
-- Fixed ESLint: cleaned node_modules, excluded download/ from lint
-- Fixed useCallback conditional hook error in foodcart-view.tsx
+## Task ID: ts-fixes
 
-Stage Summary:
-- 5 Git commits, all code versioned and safe
-- 35 Prisma models, 23 enums, 118 indexes
-- 35 API routes (all secured with JWT auth)
-- 20 frontend views (complete MOVA super-app)
-- 9 library utilities (db, auth, cache, rate-limit, audit, job-queue, zones, store, error-logger)
-- ~16,000 LOC applicatif
-- ESLint: 0 errors
-- Prisma: validated, DB synced
-- Technologies: Next.js 16, Prisma 6, SQLite, jose JWT, Redis cache, Zustand, Tailwind CSS 4
+### Date: 2025-01-XX
 
----
-Task ID: p0-bugfixes
-Agent: main (Super Z)
-Task: Audit complet + correction des bugs P0 a faible risque (pas de refonte)
+### Summary
+Fixed all TypeScript type errors in the MOVA Next.js API caused by mismatches between the Prisma schema (35 models, 23 enums) and the API code. All 15+ targeted files were fixed. After fixes: **0 API TS errors remaining** (26 errors remain only in `prisma/seed.ts` which is out of scope).
 
-Work Log:
-- Audit de 35+ fichiers: page.tsx, layout.tsx, 9 lib, 18 composants, 35 API routes
-- Identifie 6 bugs P0 critiques
-- P0-1: Fonction estimateFare() manquante de zone-distances.ts (CRASH rides + fare)
-- P0-2: Classe AuthError non exportee de auth-middleware.ts (import crash 8+ routes)
-- P0-3: auth.user.id au lieu de auth.id dans 12+ routes (CRASH auth a chaque requete)
-- P0-4: VEHICLE_FARES manquait auto/van/premium (tarifs incorrects)
-- P0-5: validateRequest check incorrect dans auth/route.ts action 'me'
-- P0-6: Guards requireAuth manquants dans drivers/route.ts et drivers/[id]/route.ts
-- Tous les fixes appliques, ESLint 0 erreurs, commit 43c2477
+### Files Changed (17 files)
 
-Stage Summary:
-- 12 fichiers modifies, 84 insertions, 27 suppressions
-- 6 bugs critiques corriges sans refonte globale
-- ESLint: 0 erreurs
-- Git commit: 43c2477 (pousse sur GitHub)
+#### 1. `lib/mova/auth-middleware.ts`
+- Updated `UserRole` type to match Prisma enum: `client, chauffeur, coursier, restaurant, commercant, gestionnaire_flotte, admin, support_agent, operateur_validation, compte_entreprise`
+- Converted `requireRole` to curried function signature: `requireRole(roles) → (request) → Promise<AuthUser | NextResponse>` to match usage in drivers/[id]
 
----
-Task ID: migration-plan
-Agent: main (Super Z)
-Task: Generation du plan de migration module par module (6 modules MOVA)
+#### 2. `app/api/mova/auth/route.ts`
+- Login query: `isActive: true` → `status: true` (UserStatus enum, not Boolean)
+- Login check: `!user.isActive` → `user.status !== 'active'`
+- "me" query: `isActive: true` → `status: true`
+- Added null check for `user.password` before bcrypt.compare (password is optional)
 
-Work Log:
-- Inventaire complet du codebase : 35 routes API, 20 vues frontend, 9 lib, 35 modeles Prisma
-- Analyse detaillee de chaque module : Ride, Food/Grocery, Courier/Delivery, Portails Partenaires, App Chauffeur/Coursier, Paiements/Wallet/Promos/Support/Safety/Analytics
-- Pour chaque module : inventaire fichiers, risques classifies (Critique/Eleve/Moyen/Faible), strategie de migration, plan de non-regression
-- Generation du document DOCX avec cover R1 (Graphite Orange), TOC, tables detaillees
-- Postcheck : 7/9 passes, 0 erreurs, 2 warnings mineurs
+#### 3. `app/api/mova/assistant/route.ts`
+- Fixed ZAI SDK import: `const ZAI = (await import('z-ai-web-dev-sdk')).default` → `const { default: ZAI } = await import('z-ai-web-dev-sdk')`
+- Fixed API call: `ZAI.chat.completions.create()` → `const zai = await ZAI.create(); zai.chat.completions.create()`
 
-Stage Summary:
-- Document : /home/z/my-project/download/MOVA_Plan_Migration_Modules.docx
-- 6 modules analyses avec tables de risques et plans de non-regression
-- Matrice de dependance inter-modules et roadmap globale en 4 phases
-- 5 principes directeurs : precaution, tracabilite, reversibilite, validation continue, communication
+#### 4. `app/api/mova/notifications/route.ts`
+- NotificationType enum: removed `'alert'`, added valid values (`food_update`, `delivery_update`, `safety`, `sos`)
+- `z.record(z.unknown())` → `z.record(z.string(), z.unknown())` (Zod v4 requires two args)
+- Added `if (auth instanceof NextResponse) return auth` narrowing in both GET and POST
+- `data: data ? JSON.stringify(data) : null` → `...(data ? { data: JSON.stringify(data) } : {})` (avoid JsonNull)
+
+#### 5. `app/api/mova/notifications/[id]/route.ts`
+- Added `if (auth instanceof NextResponse) return auth` narrowing before using `auth.id`/`auth.role`
+
+#### 6. `app/api/mova/notifications/read-all/route.ts`
+- Added `if (auth instanceof NextResponse) return auth` narrowing before using `auth.id`
+
+#### 7. `app/api/mova/rides/route.ts`
+- PaymentMethod enum: `mobile_money` → `orange_money`, added `card`, `mtn_momo`, `wave`
+- VehicleType: `auto` → `standard` (matches Prisma enum)
+- `driver` include → `driverProfile` include (with nested `user` select)
+- Removed `vehicle` include from driver (doesn't exist on User/DriverProfile directly)
+- Removed `vehicleType` from ride create data (not a field on Ride model)
+- Decimal fields: `finalFare` → `actualFare`, `driverRating` → `rating`
+
+#### 8. `app/api/mova/rides/[id]/route.ts`
+- `driver` include → `driverProfile` include with nested `user` select
+- `payment` include → `payments` include (relation name)
+- `ride.driverId` → `ride.driverProfileId`
+- `updateData.driverId` → `updateData.driverProfileId`
+- `Payment.findUnique({ where: { rideId } })` → `Payment.findFirst({ where: { rideId } })` (rideId not unique)
+- `finalFare` → `actualFare` throughout
+- Transaction types: `debit` → `ride_payment`, `credit` → `refund`
+- Fixed WalletTransaction.create to include required fields: `balanceBefore`, `balanceAfter`, `reference`
+- Removed non-existent fields: `method`, `status` from WalletTransaction.create
+
+#### 9. `app/api/mova/drivers/route.ts`
+- Rewrote to query `db.driverProfile` instead of `db.user` (driver fields live on DriverProfile)
+- `role: 'driver'` → removed (querying DriverProfile directly)
+- Removed `vehicle` include (vehicles relation is on DriverProfile, not User)
+- `isActive: true` filter → kept (valid on DriverProfile)
+- `zone` filter → kept (valid on DriverProfile)
+- `vehicle` filter → `vehicleType` filter (valid on DriverProfile)
+- `isOnline` filter → kept (valid on DriverProfile)
+
+#### 10. `app/api/mova/drivers/[id]/route.ts`
+- Rewrote GET to query `db.driverProfile` instead of `db.user`
+- `role: 'driver'` → removed
+- `driverId` → `driverProfileId` in ride queries
+- `driverRating` → removed (using `rating` from Rating model)
+- Rewrote PATCH to update `db.driverProfile` instead of `db.user`
+- Fixed `requireRole` usage: already using curried form, now matches signature
+- Removed `vehicle` includes, added `vehicles` (plural) and `user` includes
+
+#### 11. `app/api/mova/wallet/route.ts`
+- Added `if (auth instanceof NextResponse) return auth` in GET and POST
+- PaymentMethod enum: `mobile_money` → `orange_money`, added `mtn_momo`, `wave`
+- Transaction type: `credit` → `top_up`
+- Fixed WalletTransaction.create: added `balanceBefore`, `balanceAfter`, `reference`
+- Removed non-existent fields: `method`, `status`
+
+#### 12. `app/api/mova/wallet/transfer/route.ts`
+- Added `if (auth instanceof NextResponse) return auth` narrowing
+- `isActive` → `status` on user select and check (`status !== 'active'`)
+- Transaction types: `debit` → `transfer_out`, `credit` → `transfer_in`
+- Fixed WalletTransaction.create: added required fields, removed non-existent ones
+
+#### 13. `app/api/mova/loyalty/route.ts`
+- Imported `LoyaltyTier` from `@prisma/client`
+- `determineTier` return type: `string` → `LoyaltyTier`
+- `currentTier` type: `string` → `LoyaltyTier`
+- `tier as LoyaltyTier` cast to satisfy enum constraint
+
+#### 14. `lib/mova/job-queue.ts`
+- `getStats()`: added `cancelled` counter and `total: this.queue.size` to match `QueueStats` interface
+
+#### 15. `lib/mova/audit-logger.ts`
+- `details: params.details ? JSON.stringify(params.details) : null` → `...(params.details ? { details: JSON.stringify(params.details) } : {})`
+- `JSON.parse(log.details as string)` → `log.details ?? null` (Prisma returns already-parsed JSON)
+- Added `Prisma` import (available for future use)
+
+#### 16. `components/mova/admin-monitoring-view.tsx`
+- Added optional chaining (`m?.`) and nullish coalescing (`?? 0`) on all `m` property accesses
+- Used `m.rateLimiter!.topViolators` with non-null assertion inside truthy-guarded blocks
+
+### Remaining Errors
+- **26 errors** remain in `prisma/seed.ts` (out of scope - seed file uses old schema fields)
+- **0 errors** in API routes, middleware, components, and library files

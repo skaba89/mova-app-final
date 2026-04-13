@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
           password: hashedPassword,
           name: data.name,
           phone: data.phone ?? null,
-          role: 'passenger',
+          role: 'client',
         },
         select: {
           id: true,
@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
           name: true,
           phone: true,
           role: true,
-          isActive: true,
+          status: true,
           createdAt: true,
         },
       });
@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
           name: true,
           phone: true,
           role: true,
-          isActive: true,
+          status: true,
           password: true,
           createdAt: true,
         },
@@ -119,10 +119,17 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      if (!user.isActive) {
+      if (user.status !== 'active') {
         return NextResponse.json(
           { success: false, error: 'Compte desactive. Contactez le support.' },
           { status: 403 }
+        );
+      }
+
+      if (!user.password) {
+        return NextResponse.json(
+          { success: false, error: 'Compte sans mot de passe. Connectez-vous via un autre moyen.' },
+          { status: 400 }
         );
       }
 
@@ -158,7 +165,7 @@ export async function POST(request: NextRequest) {
           name: true,
           phone: true,
           role: true,
-          isActive: true,
+          status: true,
           createdAt: true,
         },
       });

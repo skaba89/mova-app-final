@@ -291,6 +291,23 @@ class JobQueue {
     this.isProcessing = false
     jobIdCounter = 0
   }
+
+  // Statistiques de la file
+  getStats(): QueueStats {
+    let pending = 0
+    let processing = 0
+    let completed = 0
+    let failed = 0
+    let cancelled = 0
+    for (const job of this.queue.values()) {
+      if (job.status === 'pending') pending++
+      else if (job.status === 'processing') processing++
+      else if (job.status === 'completed') completed++
+      else if (job.status === 'failed') failed++
+      else if (job.status === 'cancelled') cancelled++
+    }
+    return { pending, processing, completed, failed, cancelled, total: this.queue.size }
+  }
 }
 
 // Instance singleton de la file d'attente

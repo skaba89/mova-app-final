@@ -4,10 +4,10 @@ import { requireAuth, AuthError } from '@/lib/mova/auth-middleware';
 import { z } from 'zod/v4';
 
 const createNotificationSchema = z.object({
-  type: z.enum(['ride_update', 'payment', 'promotion', 'system', 'alert']),
+  type: z.enum(['ride_update', 'food_update', 'delivery_update', 'promotion', 'payment', 'system', 'safety', 'sos']),
   title: z.string().min(1, 'Le titre est requis').max(200),
   message: z.string().min(1, 'Le message est requis').max(1000),
-  data: z.record(z.unknown()).optional(),
+  data: z.record(z.string(), z.unknown()).optional(),
   userId: z.string().optional(),
 });
 
@@ -15,6 +15,7 @@ const createNotificationSchema = z.object({
 export async function GET(request: NextRequest) {
   try {
     const auth = await requireAuth(request);
+    if (auth instanceof NextResponse) return auth;
     const { searchParams } = new URL(request.url);
 
     const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10));
@@ -81,6 +82,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const auth = await requireAuth(request);
+    if (auth instanceof NextResponse) return auth;
     const body = await request.json();
 
     const parsed = createNotificationSchema.safeParse(body);
@@ -105,7 +107,7 @@ export async function POST(request: NextRequest) {
         type,
         title,
         message,
-        data: data ? JSON.stringify(data) : null,
+        ...(data ? { data: JSON.stringify(data) } : {}),
       },
     });
 

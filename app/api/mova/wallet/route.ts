@@ -6,7 +6,7 @@ import { z } from 'zod/v4';
 const topUpSchema = z.object({
   action: z.literal('top_up'),
   amount: z.number().positive('Le montant doit etre positif').max(5000000, 'Montant maximum : 5 000 000 GNF'),
-  method: z.enum(['mobile_money', 'bank_transfer', 'card']),
+  method: z.enum(['orange_money', 'mtn_momo', 'wave', 'card', 'bank_transfer']),
 });
 
 /** Convertit les champs Decimal de Prisma en nombre */
@@ -24,6 +24,7 @@ function convertDecimalFields(obj: Record<string, unknown>, fields: string[]): R
 export async function GET(request: NextRequest) {
   try {
     const auth = await requireAuth(request);
+    if (auth instanceof NextResponse) return auth;
     const { searchParams } = new URL(request.url);
 
     const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10));
@@ -97,6 +98,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const auth = await requireAuth(request);
+    if (auth instanceof NextResponse) return auth;
     const body = await request.json();
 
     const parsed = topUpSchema.safeParse(body);
@@ -136,11 +138,12 @@ export async function POST(request: NextRequest) {
       await tx.walletTransaction.create({
         data: {
           walletId: wallet!.id,
-          type: 'credit',
+          type: 'top_up',
           amount,
-          method,
+          balanceBefore: wallet!.balance,
+          balanceAfter: Number(wallet!.balance) + amount,
+          reference: `WT-TOPUP-${Date.now()}`,
           description: `Rechargement via ${method}`,
-          status: 'completed',
         },
       });
 
