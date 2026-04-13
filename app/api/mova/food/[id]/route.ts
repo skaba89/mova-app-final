@@ -1,0 +1,306 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { requireAuth } from '@/lib/mova/auth-middleware'
+import db from '@/lib/db'
+import { z } from 'zod/v4'
+
+// Utilitaire de conversion Decimal vers Number
+function num(value: unknown): number | null {
+  if (value === null || value === undefined) return null
+  return Number(value)
+}
+
+// Schema de validation pour la mise a jour du statut
+const updateStatusSchema = z.object({
+  status: z.enum([
+    'confirmed', 'preparing', 'ready',
+    'picked_up', 'in_transit',
+    'delivered', 'cancelled',
+  ]),
+  otp: z.string().length(4, "Le code OTP doit contenir 4 chiffres").optional(),
+})
+
+// Transitions de statut autorisees
+const RESTAURANT_TRANSITIONS: Record<string, string[]> = {
+  pending: ['confirmed', 'cancelled'],
+  confirmed: ['preparing', 'cancelled'],
+  preparing: ['ready', 'cancelled'],
+  ready: ['picked_up', 'cancelled'],
+}
+
+const DRIVER_TRANSITIONS: Record<string, string[]> = {
+  ready: ['picked_up'],
+  picked_up: ['in_transit'],
+  in_transit: ['delivered'],
+}
+
+const TERMINAL_STATES = new Set(['delivered', 'cancelled'])
+
+// Generer une reference de paiement unique
+function generatePaymentReference(): string {
+  return `PAY-FOOD-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`
+}
+
+// GET /api/mova/food/[id] - Recuperer une commande alimentaire
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const auth = await requireAuth(request)
+    if (auth instanceof NextResponse) return auth
+
+    const { id } = await params
+
+    const order = await db.foodOrder.findUnique({
+      where: { id },
+      include: {
+        restaurant: {
+          select: {
+            id: true,
+            name: true,
+            address: true,
+            logoUrl: true,
+            phone: true,
+          },
+        },
+        driverProfile: {
+          select: {
+            id: true,
+            user: {
+              select: {
+                id: true,
+                name: true,
+                phone: true,
+                avatar: true,
+              },
+            },
+            vehicleType: true,
+            currentLocationLat: true,
+            currentLocationLng: true,
+          },
+        },
+        payments: {
+          select: {
+            id: true,
+            amount: true,
+            method: true,
+            status: true,
+            reference: true,
+            createdAt: true,
+          },
+        },
+      },
+    })
+
+    if (!order) {
+      return NextResponse.json(
+        { success: false, error: 'Commande introuvable' },
+        { status: 404 }
+      )
+    }
+
+    // Verifier que l'utilisateur est le proprietaire ou un admin
+    if (order.customerId !== auth.id && auth.role !== 'admin') {
+      return NextResponse.json(
+        { success: false, error: 'Acces refuse' },
+        { status: 403 }
+      )
+    }
+
+    // Conversion des champs Decimal
+    const convertedOrder = {
+      ...order,
+      subtotal: num(order.subtotal),
+      deliveryFee: num(order.deliveryFee),
+      serviceFee: num(order.serviceFee),
+      totalAmount: num(order.totalAmount),
+      deliveryLat: num(order.deliveryLat),
+      deliveryLng: num(order.deliveryLng),
+      payments: order.payments.map((p) => ({
+        ...p,
+        amount: num(p.amount),
+      })),
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: { order: convertedOrder },
+    })
+  } catch (error) {
+    console.error('[FOOD] Erreur lors de la recuperation de la commande:', error)
+    return NextResponse.json(
+      { success: false, error: 'Erreur interne du serveur' },
+      { status: 500 }
+    )
+  }
+}
+
+// PATCH /api/mova/food/[id] - Mettre a jour le statut d'une commande
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const auth = await requireAuth(request)
+    if (auth instanceof NextResponse) return auth
+
+    const { id } = await params
+    const body = await request.json()
+    const parsed = updateStatusSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json(
+        { success: false, error: parsed.error.issues[0].message },
+        { status: 400 }
+      )
+    }
+
+    const { status, otp } = parsed.data
+
+    // Recuperer la commande existante
+    const order = await db.foodOrder.findUnique({
+      where: { id },
+    })
+
+    if (!order) {
+      return NextResponse.json(
+        { success: false, error: 'Commande introuvable' },
+        { status: 404 }
+      )
+    }
+
+    // Verifier que la commande n'est pas dans un etat terminal
+    if (TERMINAL_STATES.has(order.status)) {
+      return NextResponse.json(
+        { success: false, error: 'La commande est deja dans un etat terminal et ne peut plus etre modifiee' },
+        { status: 400 }
+      )
+    }
+
+    // Verification du OTP pour la livraison
+    if (status === 'delivered') {
+      if (!otp) {
+        return NextResponse.json(
+          { success: false, error: 'Le code OTP est requis pour confirmer la livraison' },
+          { status: 400 }
+        )
+      }
+      if (order.otp !== otp) {
+        return NextResponse.json(
+          { success: false, error: 'Code OTP invalide' },
+          { status: 400 }
+        )
+      }
+    }
+
+    // Determiner le type de transition
+    const isDriverTransition = ['picked_up', 'in_transit', 'delivered'].includes(status)
+
+    if (isDriverTransition) {
+      const allowed = DRIVER_TRANSITIONS[order.status] ?? []
+      if (!allowed.includes(status)) {
+        return NextResponse.json(
+          { success: false, error: `Transition invalide : ${order.status} vers ${status}` },
+          { status: 400 }
+        )
+      }
+    } else {
+      const allowed = RESTAURANT_TRANSITIONS[order.status] ?? []
+      if (!allowed.includes(status)) {
+        return NextResponse.json(
+          { success: false, error: `Transition invalide : ${order.status} vers ${status}` },
+          { status: 400 }
+        )
+      }
+    }
+
+    // Mettre a jour la commande
+    const updatedOrder = await db.foodOrder.update({
+      where: { id },
+      data: {
+        status,
+        ...(status === 'delivered' ? { actualDeliveryTime: 0 } : {}),
+        ...(status === 'cancelled' ? { cancelledAt: new Date() } : {}),
+      },
+      include: {
+        restaurant: {
+          select: {
+            id: true,
+            name: true,
+            address: true,
+            logoUrl: true,
+            phone: true,
+          },
+        },
+        driverProfile: {
+          select: {
+            id: true,
+            user: {
+              select: {
+                id: true,
+                name: true,
+                phone: true,
+              },
+            },
+          },
+        },
+      },
+    })
+
+    // Creer le paiement a la livraison si le statut est 'delivered'
+    if (status === 'delivered' && order.paymentStatus === 'pending') {
+      await db.payment.updateMany({
+        where: {
+          foodOrderId: id,
+          status: 'pending',
+        },
+        data: {
+          status: 'completed',
+        },
+      })
+
+      await db.foodOrder.update({
+        where: { id },
+        data: { paymentStatus: 'completed' },
+      })
+    }
+
+    // Annuler les paiements en attente si la commande est annulee
+    if (status === 'cancelled' && order.paymentStatus === 'pending') {
+      await db.payment.updateMany({
+        where: {
+          foodOrderId: id,
+          status: 'pending',
+        },
+        data: {
+          status: 'cancelled',
+        },
+      })
+
+      await db.foodOrder.update({
+        where: { id },
+        data: { paymentStatus: 'cancelled' },
+      })
+    }
+
+    const convertedOrder = {
+      ...updatedOrder,
+      subtotal: num(updatedOrder.subtotal),
+      deliveryFee: num(updatedOrder.deliveryFee),
+      serviceFee: num(updatedOrder.serviceFee),
+      totalAmount: num(updatedOrder.totalAmount),
+      deliveryLat: num(updatedOrder.deliveryLat),
+      deliveryLng: num(updatedOrder.deliveryLng),
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: { order: convertedOrder },
+    })
+  } catch (error) {
+    console.error('[FOOD] Erreur lors de la mise a jour de la commande:', error)
+    return NextResponse.json(
+      { success: false, error: 'Erreur interne du serveur' },
+      { status: 500 }
+    )
+  }
+}

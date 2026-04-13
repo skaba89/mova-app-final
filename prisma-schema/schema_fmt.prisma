@@ -1,0 +1,1251 @@
+// ============================================================
+// MOVA Super-App - Complete Prisma Schema
+// Ride-hailing platform for Conakry, Guinea
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// ENUMS (23 total)
+// ============================================================
+
+// --- User & Auth ---
+enum UserRole {
+  client
+  chauffeur
+  coursier
+  restaurant
+  commercant
+  gestionnaire_flotte
+  admin
+  support_agent
+  operateur_validation
+  compte_entreprise
+}
+
+enum UserStatus {
+  active
+  inactive
+  suspended
+  pending_verification
+  banned
+  deleted
+}
+
+enum KYCStatus {
+  not_started
+  pending
+  verified
+  rejected
+  expired
+}
+
+enum AuthMethod {
+  email
+  phone
+  google
+  apple
+  facebook
+}
+
+// --- Ride & Transport ---
+enum RideStatus {
+  requested
+  accepted
+  arrived
+  in_progress
+  completed
+  cancelled
+  no_show
+  driver_cancelled
+  passenger_cancelled
+  scheduled
+  repositioning
+  waiting
+  paused
+  emergency_stop
+  refunded
+}
+
+enum VehicleType {
+  standard
+  premium
+  van
+  moto
+  bicycle
+  camion
+  pickup
+}
+
+enum PaymentMethod {
+  cash
+  card
+  wallet
+  orange_money
+  mtn_momo
+  wave
+}
+
+// --- Food ---
+enum FoodOrderStatus {
+  pending
+  confirmed
+  preparing
+  ready
+  picked_up
+  in_transit
+  delivered
+  cancelled
+  refused
+  delayed
+  refund_requested
+  refunded
+  partial_refund
+  driver_assigned
+  restaurant_accepted
+}
+
+// --- Delivery ---
+enum DeliveryStatus {
+  pending
+  accepted
+  picked_up
+  in_transit
+  delivered
+  cancelled
+  failed
+  returned
+  delayed
+}
+
+// --- Business ---
+enum BusinessAccountStatus {
+  active
+  inactive
+  suspended
+  trial
+  overdue
+}
+
+enum SubscriptionPlan {
+  free
+  basic
+  premium
+  enterprise
+}
+
+// --- Wallet ---
+enum TransactionType {
+  top_up
+  ride_payment
+  food_payment
+  delivery_payment
+  transfer_in
+  transfer_out
+  refund
+  cashback
+  promotion_credit
+  fee
+}
+
+enum TransactionStatus {
+  pending
+  completed
+  failed
+  reversed
+  cancelled
+}
+
+// --- Notifications ---
+enum NotificationType {
+  ride_update
+  food_update
+  delivery_update
+  promotion
+  payment
+  system
+  safety
+  sos
+}
+
+enum NotificationChannel {
+  push
+  sms
+  email
+  in_app
+}
+
+// --- Other ---
+enum IncidentStatus {
+  reported
+  investigating
+  resolved
+  dismissed
+  escalated
+}
+
+enum IncidentSeverity {
+  low
+  medium
+  high
+  critical
+}
+
+enum IncidentType {
+  accident
+  harassment
+  theft
+  fraud
+  safety_violation
+  vehicle_damage
+  dispute
+  other
+}
+
+enum PromotionType {
+  percentage
+  fixed
+  free_delivery
+  free_ride
+}
+
+enum PromotionStatus {
+  active
+  inactive
+  expired
+  scheduled
+  used
+}
+
+enum ReferralStatus {
+  pending
+  completed
+  rewarded
+  expired
+  cancelled
+}
+
+enum LoyaltyTier {
+  bronze
+  silver
+  gold
+  platinum
+  diamond
+}
+
+enum AuditSeverity {
+  info
+  warning
+  error
+  critical
+}
+
+// ============================================================
+// MODELS (35 total)
+// ============================================================
+
+// ----------------------------------------------------------
+// 1. User
+// ----------------------------------------------------------
+model User {
+  id                String     @id @default(cuid())
+  name              String
+  email             String     @unique
+  phone             String?
+  password          String?
+  avatar            String?
+  role              UserRole   @default(client)
+  status            UserStatus @default(pending_verification)
+  kycStatus         KYCStatus  @default(not_started)
+  authMethod        AuthMethod @default(phone)
+  fcmToken          String?
+  lastLogin         DateTime?
+  rating            Float      @default(0)
+  totalRides        Int        @default(0)
+  totalSpent        Decimal    @default(0)
+  preferredLanguage String     @default("fr")
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  // Relations
+  rides               Ride[]
+  foodOrders          FoodOrder[]
+  deliveries          Delivery[]
+  payments            Payment[]
+  wallet              Wallet?
+  notifications       Notification[]
+  userPromotions      UserPromotion[]
+  referralsGiven      Referral[]           @relation("Referrer")
+  referralReceived    Referral?            @relation("Referred")
+  loyaltyProfile      LoyaltyProfile?
+  ratingsGiven        Rating[]             @relation("RatingsGiven")
+  ratingsReceived     Rating[]             @relation("RatingsReceived")
+  favoriteLocations   FavoriteLocation[]
+  sosAlerts           SOSAlert[]
+  bookings            Booking[]
+  scheduledRides      ScheduledRide[]
+  marketplaceListings MarketplaceListing[]
+  pushSubscriptions   PushSubscription[]
+  driverProfile       DriverProfile?
+  incidentsReported   Incident[]           @relation("IncidentReporter")
+  incidentsRelated    Incident[]           @relation("IncidentRelatedUser")
+  restaurants         Restaurant[]
+  businessEmployees   BusinessEmployee[]
+  familyAccountsOwned FamilyAccount[]      @relation("FamilyOwner")
+  familyMemberships   FamilyMember[]
+
+  @@index([status])
+  @@index([role])
+  @@index([phone])
+  @@map("users")
+}
+
+// ----------------------------------------------------------
+// 2. DriverProfile
+// ----------------------------------------------------------
+model DriverProfile {
+  id                  String      @id @default(cuid())
+  userId              String      @unique
+  vehicleType         VehicleType @default(standard)
+  licenseNumber       String?
+  licenseExpiry       DateTime?
+  isActive            Boolean     @default(true)
+  isOnline            Boolean     @default(false)
+  totalTrips          Int         @default(0)
+  totalEarnings       Decimal     @default(0)
+  rating              Float       @default(0)
+  currentLocationLat  Float?
+  currentLocationLng  Float?
+  zone                String?
+  bankAccountNumber   String?
+  bankName            String?
+  mobileMoneyPhone    String?
+  mobileMoneyProvider String?
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+
+  // Relations
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vehicles        Vehicle[]
+  rides           Ride[]
+  foodOrders      FoodOrder[]
+  deliveries      Delivery[]
+  driverDocuments DriverDocument[]
+  driverEarnings  DriverEarnings[]
+
+  @@index([isActive])
+  @@index([isOnline])
+  @@index([zone])
+  @@map("driver_profiles")
+}
+
+// ----------------------------------------------------------
+// 3. Vehicle
+// ----------------------------------------------------------
+model Vehicle {
+  id              String      @id @default(cuid())
+  driverProfileId String
+  type            VehicleType
+  brand           String
+  model           String
+  year            Int
+  color           String?
+  plateNumber     String      @unique
+  capacity        Int         @default(4)
+  isActive        Boolean     @default(true)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  // Relations
+  driverProfile DriverProfile @relation(fields: [driverProfileId], references: [id], onDelete: Cascade)
+  rides         Ride[]
+
+  @@index([driverProfileId])
+  @@index([isActive])
+  @@map("vehicles")
+}
+
+// ----------------------------------------------------------
+// 4. Ride
+// ----------------------------------------------------------
+model Ride {
+  id                 String            @id @default(cuid())
+  passengerId        String
+  driverProfileId    String?
+  vehicleId          String?
+  status             RideStatus        @default(requested)
+  pickupAddress      String
+  pickupLat          Float
+  pickupLng          Float
+  pickupZone         String?
+  dropoffAddress     String
+  dropoffLat         Float
+  dropoffLng         Float
+  dropoffZone        String?
+  estimatedDistance  Float?
+  actualDistance     Float?
+  estimatedFare      Decimal
+  actualFare         Decimal?
+  estimatedDuration  Int?
+  actualDuration     Int?
+  paymentMethod      PaymentMethod
+  paymentStatus      TransactionStatus @default(pending)
+  passengerNote      String?
+  driverNote         String?
+  otp                String?
+  scheduledAt        DateTime?
+  cancelledAt        DateTime?
+  cancellationReason String?
+  startedAt          DateTime?
+  completedAt        DateTime?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  // Relations
+  passenger      User             @relation(fields: [passengerId], references: [id], onDelete: Cascade)
+  driverProfile  DriverProfile?   @relation(fields: [driverProfileId], references: [id], onDelete: SetNull)
+  vehicle        Vehicle?         @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  payments       Payment[]
+  ratings        Rating[]
+  incidents      Incident[]
+  sosAlerts      SOSAlert[]
+  scheduledRides ScheduledRide[]
+  driverEarnings DriverEarnings[]
+
+  @@index([passengerId])
+  @@index([driverProfileId])
+  @@index([status])
+  @@index([scheduledAt])
+  @@index([createdAt])
+  @@map("rides")
+}
+
+// ----------------------------------------------------------
+// 5. Payment
+// ----------------------------------------------------------
+model Payment {
+  id                    String            @id @default(cuid())
+  userId                String
+  rideId                String?
+  foodOrderId           String?
+  deliveryId            String?
+  amount                Decimal
+  method                PaymentMethod
+  status                TransactionStatus @default(pending)
+  reference             String            @unique
+  externalTransactionId String?
+  description           String?
+  metadata              Json?
+  createdAt             DateTime          @default(now())
+
+  // Relations
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ride      Ride?      @relation(fields: [rideId], references: [id], onDelete: SetNull)
+  foodOrder FoodOrder? @relation(fields: [foodOrderId], references: [id], onDelete: SetNull)
+  delivery  Delivery?  @relation(fields: [deliveryId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([rideId])
+  @@index([foodOrderId])
+  @@index([deliveryId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("payments")
+}
+
+// ----------------------------------------------------------
+// 6. Wallet
+// ----------------------------------------------------------
+model Wallet {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  balance   Decimal  @default(0)
+  currency  String   @default("GNF")
+  isFrozen  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  walletTransactions WalletTransaction[]
+
+  @@index([userId])
+  @@map("wallets")
+}
+
+// ----------------------------------------------------------
+// 7. WalletTransaction
+// ----------------------------------------------------------
+model WalletTransaction {
+  id                   String          @id @default(cuid())
+  walletId             String
+  type                 TransactionType
+  amount               Decimal
+  balanceBefore        Decimal
+  balanceAfter         Decimal
+  reference            String
+  description          String?
+  relatedTransactionId String?
+  metadata             Json?
+  createdAt            DateTime        @default(now())
+
+  // Relations
+  wallet Wallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+  @@index([walletId])
+  @@index([type])
+  @@index([createdAt])
+  @@map("wallet_transactions")
+}
+
+// ----------------------------------------------------------
+// 8. Restaurant
+// ----------------------------------------------------------
+model Restaurant {
+  id                    String   @id @default(cuid())
+  ownerId               String
+  name                  String
+  description           String?
+  address               String?
+  lat                   Float?
+  lng                   Float?
+  zone                  String?
+  phone                 String?
+  email                 String?
+  imageUrl              String?
+  logoUrl               String?
+  isOpen                Boolean  @default(false)
+  rating                Float    @default(0)
+  deliveryFee           Decimal  @default(0)
+  minOrderAmount        Decimal  @default(0)
+  estimatedDeliveryTime Int?
+  operatingHours        Json?
+  isActive              Boolean  @default(true)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  // Relations
+  owner      User        @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  menuItems  MenuItem[]
+  foodOrders FoodOrder[]
+
+  @@index([ownerId])
+  @@index([isActive])
+  @@index([zone])
+  @@map("restaurants")
+}
+
+// ----------------------------------------------------------
+// 9. MenuItem
+// ----------------------------------------------------------
+model MenuItem {
+  id              String   @id @default(cuid())
+  restaurantId    String
+  name            String
+  description     String?
+  price           Decimal
+  imageUrl        String?
+  category        String?
+  isAvailable     Boolean  @default(true)
+  preparationTime Int?
+  calories        Int?
+  isPopular       Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId])
+  @@index([category])
+  @@index([isAvailable])
+  @@map("menu_items")
+}
+
+// ----------------------------------------------------------
+// 10. FoodOrder
+// ----------------------------------------------------------
+model FoodOrder {
+  id                    String            @id @default(cuid())
+  customerId            String
+  restaurantId          String
+  driverProfileId       String?
+  status                FoodOrderStatus   @default(pending)
+  items                 Json
+  subtotal              Decimal
+  deliveryFee           Decimal           @default(0)
+  serviceFee            Decimal           @default(0)
+  totalAmount           Decimal
+  paymentMethod         PaymentMethod
+  paymentStatus         TransactionStatus @default(pending)
+  deliveryAddress       String
+  deliveryLat           Float
+  deliveryLng           Float
+  deliveryZone          String?
+  customerNote          String?
+  restaurantNote        String?
+  otp                   String?
+  estimatedDeliveryTime Int?
+  actualDeliveryTime    Int?
+  cancelledAt           DateTime?
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+
+  // Relations
+  customer      User           @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  restaurant    Restaurant     @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  driverProfile DriverProfile? @relation(fields: [driverProfileId], references: [id], onDelete: SetNull)
+  payments      Payment[]
+  ratings       Rating[]
+
+  @@index([customerId])
+  @@index([restaurantId])
+  @@index([driverProfileId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("food_orders")
+}
+
+// ----------------------------------------------------------
+// 11. Delivery
+// ----------------------------------------------------------
+model Delivery {
+  id                String            @id @default(cuid())
+  customerId        String
+  courierId         String?
+  status            DeliveryStatus    @default(pending)
+  packageType       String?
+  packageWeight     Float?
+  declaredValue     Decimal?
+  pickupAddress     String
+  pickupLat         Float
+  pickupLng         Float
+  pickupZone        String?
+  dropoffAddress    String
+  dropoffLat        Float
+  dropoffLng        Float
+  dropoffZone       String?
+  estimatedPrice    Decimal
+  actualPrice       Decimal?
+  estimatedDistance Float?
+  actualDistance    Float?
+  paymentMethod     PaymentMethod
+  paymentStatus     TransactionStatus @default(pending)
+  otp               String?
+  recipientName     String?
+  recipientPhone    String?
+  recipientNote     String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  // Relations
+  customer       User             @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  courier        DriverProfile?   @relation(fields: [courierId], references: [id], onDelete: SetNull)
+  payments       Payment[]
+  incidents      Incident[]
+  ratings        Rating[]
+  driverEarnings DriverEarnings[]
+
+  @@index([customerId])
+  @@index([courierId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("deliveries")
+}
+
+// ----------------------------------------------------------
+// 12. Booking
+// ----------------------------------------------------------
+model Booking {
+  id             String      @id @default(cuid())
+  userId         String
+  vehicleType    VehicleType @default(standard)
+  pickupAddress  String
+  pickupLat      Float
+  pickupLng      Float
+  pickupZone     String?
+  dropoffAddress String
+  dropoffLat     Float
+  dropoffLng     Float
+  dropoffZone    String?
+  scheduledAt    DateTime
+  estimatedFare  Decimal
+  status         String      @default("pending")
+  passengerCount Int         @default(1)
+  luggageCount   Int         @default(0)
+  notes          String?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@index([scheduledAt])
+  @@map("bookings")
+}
+
+// ----------------------------------------------------------
+// 13. Notification
+// ----------------------------------------------------------
+model Notification {
+  id        String              @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  message   String
+  data      Json?
+  channel   NotificationChannel @default(push)
+  isRead    Boolean             @default(false)
+  createdAt DateTime            @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isRead])
+  @@index([type])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+// ----------------------------------------------------------
+// 14. Promotion
+// ----------------------------------------------------------
+model Promotion {
+  id            String          @id @default(cuid())
+  code          String          @unique
+  title         String
+  description   String?
+  type          PromotionType
+  discountValue Decimal
+  minAmount     Decimal?
+  maxDiscount   Decimal?
+  validFrom     DateTime
+  validUntil    DateTime
+  usageLimit    Int
+  usageCount    Int             @default(0)
+  status        PromotionStatus @default(active)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  // Relations
+  userPromotions UserPromotion[]
+
+  @@index([status])
+  @@index([validFrom])
+  @@index([validUntil])
+  @@index([code])
+  @@map("promotions")
+}
+
+// ----------------------------------------------------------
+// 15. UserPromotion
+// ----------------------------------------------------------
+model UserPromotion {
+  id          String   @id @default(cuid())
+  userId      String
+  promotionId String
+  usedAt      DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  // Relations
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  promotion Promotion @relation(fields: [promotionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, promotionId])
+  @@index([userId])
+  @@index([promotionId])
+  @@map("user_promotions")
+}
+
+// ----------------------------------------------------------
+// 16. Referral
+// ----------------------------------------------------------
+model Referral {
+  id          String         @id @default(cuid())
+  referrerId  String
+  referredId  String         @unique
+  code        String         @unique
+  status      ReferralStatus @default(pending)
+  bonusAmount Decimal        @default(0)
+  rewardedAt  DateTime?
+  createdAt   DateTime       @default(now())
+
+  // Relations
+  referrer User @relation("Referrer", fields: [referrerId], references: [id], onDelete: Cascade)
+  referred User @relation("Referred", fields: [referredId], references: [id], onDelete: Cascade)
+
+  @@index([referrerId])
+  @@index([referredId])
+  @@index([code])
+  @@index([status])
+  @@map("referrals")
+}
+
+// ----------------------------------------------------------
+// 17. LoyaltyProfile
+// ----------------------------------------------------------
+model LoyaltyProfile {
+  id               String      @id @default(cuid())
+  userId           String      @unique
+  points           Int         @default(0)
+  tier             LoyaltyTier @default(bronze)
+  streakDays       Int         @default(0)
+  lastActivityDate DateTime?
+  totalEarned      Int         @default(0)
+  totalRedeemed    Int         @default(0)
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  // Relations
+  user                User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  loyaltyTransactions LoyaltyTransaction[]
+
+  @@index([userId])
+  @@index([tier])
+  @@map("loyalty_profiles")
+}
+
+// ----------------------------------------------------------
+// 18. LoyaltyTransaction
+// ----------------------------------------------------------
+model LoyaltyTransaction {
+  id               String   @id @default(cuid())
+  loyaltyProfileId String
+  type             String
+  points           Int
+  description      String?
+  relatedId        String?
+  createdAt        DateTime @default(now())
+
+  // Relations
+  loyaltyProfile LoyaltyProfile @relation(fields: [loyaltyProfileId], references: [id], onDelete: Cascade)
+
+  @@index([loyaltyProfileId])
+  @@index([type])
+  @@index([createdAt])
+  @@map("loyalty_transactions")
+}
+
+// ----------------------------------------------------------
+// 19. BusinessAccount
+// ----------------------------------------------------------
+model BusinessAccount {
+  id               String                @id @default(cuid())
+  name             String
+  email            String                @unique
+  phone            String?
+  address          String?
+  siretNumber      String?
+  subscriptionPlan SubscriptionPlan      @default(free)
+  monthlyLimit     Decimal               @default(0)
+  currentSpend     Decimal               @default(0)
+  status           BusinessAccountStatus @default(active)
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+
+  // Relations
+  employees BusinessEmployee[]
+
+  @@index([status])
+  @@index([email])
+  @@map("business_accounts")
+}
+
+// ----------------------------------------------------------
+// 20. BusinessEmployee
+// ----------------------------------------------------------
+model BusinessEmployee {
+  id                String   @id @default(cuid())
+  businessAccountId String
+  userId            String   @unique
+  role              String   @default("employee")
+  monthlyLimit      Decimal  @default(0)
+  currentSpend      Decimal  @default(0)
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+
+  // Relations
+  businessAccount BusinessAccount @relation(fields: [businessAccountId], references: [id], onDelete: Cascade)
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([businessAccountId])
+  @@index([userId])
+  @@index([isActive])
+  @@map("business_employees")
+}
+
+// ----------------------------------------------------------
+// 21. Incident
+// ----------------------------------------------------------
+model Incident {
+  id            String           @id @default(cuid())
+  reporterId    String
+  relatedUserId String?
+  rideId        String?
+  deliveryId    String?
+  type          IncidentType
+  severity      IncidentSeverity
+  status        IncidentStatus   @default(reported)
+  description   String
+  attachments   Json?
+  resolution    String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  // Relations
+  reporter    User      @relation("IncidentReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  relatedUser User?     @relation("IncidentRelatedUser", fields: [relatedUserId], references: [id], onDelete: SetNull)
+  ride        Ride?     @relation(fields: [rideId], references: [id], onDelete: SetNull)
+  delivery    Delivery? @relation(fields: [deliveryId], references: [id], onDelete: SetNull)
+
+  @@index([reporterId])
+  @@index([relatedUserId])
+  @@index([rideId])
+  @@index([deliveryId])
+  @@index([status])
+  @@index([severity])
+  @@index([type])
+  @@index([createdAt])
+  @@map("incidents")
+}
+
+// ----------------------------------------------------------
+// 22. Rating
+// ----------------------------------------------------------
+model Rating {
+  id          String   @id @default(cuid())
+  rideId      String?
+  foodOrderId String?
+  deliveryId  String?
+  fromUserId  String
+  toUserId    String
+  score       Int
+  comment     String?
+  createdAt   DateTime @default(now())
+
+  // Relations
+  ride      Ride?      @relation(fields: [rideId], references: [id], onDelete: SetNull)
+  foodOrder FoodOrder? @relation(fields: [foodOrderId], references: [id], onDelete: SetNull)
+  delivery  Delivery?  @relation(fields: [deliveryId], references: [id], onDelete: SetNull)
+  fromUser  User       @relation("RatingsGiven", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUser    User       @relation("RatingsReceived", fields: [toUserId], references: [id], onDelete: Cascade)
+
+  @@index([rideId])
+  @@index([foodOrderId])
+  @@index([deliveryId])
+  @@index([fromUserId])
+  @@index([toUserId])
+  @@index([createdAt])
+  @@map("ratings")
+}
+
+// ----------------------------------------------------------
+// 23. Zone
+// ----------------------------------------------------------
+model Zone {
+  id           String   @id @default(cuid())
+  name         String   @unique
+  lat          Float
+  lng          Float
+  radiusMeters Int
+  basePrice    Decimal
+  pricePerKm   Decimal
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([isActive])
+  @@map("zones")
+}
+
+// ----------------------------------------------------------
+// 24. FareRule
+// ----------------------------------------------------------
+model FareRule {
+  id              String      @id @default(cuid())
+  vehicleType     VehicleType
+  baseFare        Decimal
+  pricePerKm      Decimal
+  pricePerMinute  Decimal
+  minimumFare     Decimal
+  surgeMultiplier Float       @default(1.0)
+  effectiveFrom   DateTime
+  effectiveUntil  DateTime?
+  isActive        Boolean     @default(true)
+  createdAt       DateTime    @default(now())
+
+  @@index([vehicleType])
+  @@index([isActive])
+  @@index([effectiveFrom])
+  @@map("fare_rules")
+}
+
+// ----------------------------------------------------------
+// 25. AuditLog
+// ----------------------------------------------------------
+model AuditLog {
+  id         String        @id @default(cuid())
+  userId     String?
+  action     String
+  resource   String
+  resourceId String?
+  severity   AuditSeverity @default(info)
+  ipAddress  String?
+  userAgent  String?
+  details    Json?
+  createdAt  DateTime      @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([resource])
+  @@index([severity])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// ----------------------------------------------------------
+// 26. ChatMessage
+// ----------------------------------------------------------
+model ChatMessage {
+  id        String   @id @default(cuid())
+  rideId    String
+  senderId  String
+  message   String
+  type      String   @default("text")
+  createdAt DateTime @default(now())
+
+  @@index([rideId])
+  @@index([senderId])
+  @@index([createdAt])
+  @@map("chat_messages")
+}
+
+// ----------------------------------------------------------
+// 27. FavoriteLocation
+// ----------------------------------------------------------
+model FavoriteLocation {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  address   String
+  lat       Float
+  lng       Float
+  type      String
+  createdAt DateTime @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("favorite_locations")
+}
+
+// ----------------------------------------------------------
+// 28. SOSAlert
+// ----------------------------------------------------------
+model SOSAlert {
+  id               String    @id @default(cuid())
+  userId           String
+  rideId           String?
+  lat              Float
+  lng              Float
+  status           String    @default("active")
+  contactsNotified Json?
+  resolvedAt       DateTime?
+  createdAt        DateTime  @default(now())
+
+  // Relations
+  user User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ride Ride? @relation(fields: [rideId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([rideId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("sos_alerts")
+}
+
+// ----------------------------------------------------------
+// 29. DriverDocument
+// ----------------------------------------------------------
+model DriverDocument {
+  id              String    @id @default(cuid())
+  driverProfileId String
+  documentType    String
+  documentNumber  String
+  imageUrl        String
+  verified        Boolean   @default(false)
+  verifiedAt      DateTime?
+  expiresAt       DateTime?
+  createdAt       DateTime  @default(now())
+
+  // Relations
+  driverProfile DriverProfile @relation(fields: [driverProfileId], references: [id], onDelete: Cascade)
+
+  @@index([driverProfileId])
+  @@index([documentType])
+  @@index([verified])
+  @@map("driver_documents")
+}
+
+// ----------------------------------------------------------
+// 30. ScheduledRide
+// ----------------------------------------------------------
+model ScheduledRide {
+  id             String   @id @default(cuid())
+  userId         String
+  rideId         String?
+  pickupAddress  String
+  pickupLat      Float
+  pickupLng      Float
+  dropoffAddress String
+  dropoffLat     Float
+  dropoffLng     Float
+  scheduledAt    DateTime
+  status         String   @default("pending")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  user User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ride Ride? @relation(fields: [rideId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([rideId])
+  @@index([status])
+  @@index([scheduledAt])
+  @@map("scheduled_rides")
+}
+
+// ----------------------------------------------------------
+// 31. MarketplaceListing
+// ----------------------------------------------------------
+model MarketplaceListing {
+  id          String   @id @default(cuid())
+  sellerId    String
+  title       String
+  description String?
+  price       Decimal
+  category    String?
+  imageUrl    String?
+  condition   String?
+  location    String?
+  lat         Float?
+  lng         Float?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  seller User @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+
+  @@index([sellerId])
+  @@index([category])
+  @@index([isActive])
+  @@index([createdAt])
+  @@map("marketplace_listings")
+}
+
+// ----------------------------------------------------------
+// 32. PushSubscription
+// ----------------------------------------------------------
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  endpoint  String
+  p256dhKey String
+  authKey   String
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("push_subscriptions")
+}
+
+// ----------------------------------------------------------
+// 33. FamilyAccount
+// ----------------------------------------------------------
+model FamilyAccount {
+  id                 String   @id @default(cuid())
+  ownerId            String
+  name               String
+  memberLimit        Int      @default(5)
+  currentMemberCount Int      @default(0)
+  monthlyBudget      Decimal  @default(0)
+  currentSpend       Decimal  @default(0)
+  isActive           Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  // Relations
+  owner   User           @relation("FamilyOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  members FamilyMember[]
+
+  @@index([ownerId])
+  @@index([isActive])
+  @@map("family_accounts")
+}
+
+// ----------------------------------------------------------
+// 34. FamilyMember
+// ----------------------------------------------------------
+model FamilyMember {
+  id              String   @id @default(cuid())
+  familyAccountId String
+  userId          String
+  role            String   @default("member")
+  monthlyLimit    Decimal  @default(0)
+  currentSpend    Decimal  @default(0)
+  isActive        Boolean  @default(true)
+  addedAt         DateTime @default(now())
+  createdAt       DateTime @default(now())
+
+  // Relations
+  familyAccount FamilyAccount @relation(fields: [familyAccountId], references: [id], onDelete: Cascade)
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([familyAccountId])
+  @@index([userId])
+  @@index([isActive])
+  @@map("family_members")
+}
+
+// ----------------------------------------------------------
+// 35. DriverEarnings
+// ----------------------------------------------------------
+model DriverEarnings {
+  id              String   @id @default(cuid())
+  driverProfileId String
+  rideId          String?
+  deliveryId      String?
+  amount          Decimal
+  platformFee     Decimal
+  driverEarning   Decimal
+  period          String
+  createdAt       DateTime @default(now())
+
+  // Relations
+  driverProfile DriverProfile @relation(fields: [driverProfileId], references: [id], onDelete: Cascade)
+  ride          Ride?         @relation(fields: [rideId], references: [id], onDelete: SetNull)
+  delivery      Delivery?     @relation(fields: [deliveryId], references: [id], onDelete: SetNull)
+
+  @@index([driverProfileId])
+  @@index([rideId])
+  @@index([deliveryId])
+  @@index([period])
+  @@index([createdAt])
+  @@map("driver_earnings")
+}
