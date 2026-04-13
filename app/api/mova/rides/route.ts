@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
     const skip = (page - 1) * limit;
 
     // Seuls les admins peuvent voir les courses d'autres utilisateurs
-    const filterUserId = userId && auth.user.role === 'admin' ? userId : auth.user.id;
+    const filterUserId = userId && auth.role === 'admin' ? userId : auth.id;
 
     const where: Record<string, unknown> = { passengerId: filterUserId };
     if (status) {
@@ -143,7 +143,7 @@ export async function POST(request: NextRequest) {
     // Verification de l'existence du portefeuille si paiement par wallet
     if (data.paymentMethod === 'wallet') {
       const wallet = await db.wallet.findUnique({
-        where: { userId: auth.user.id },
+        where: { userId: auth.id },
       });
       if (!wallet) {
         return NextResponse.json(
@@ -162,7 +162,7 @@ export async function POST(request: NextRequest) {
     // Creation de la course
     const ride = await db.ride.create({
       data: {
-        passengerId: auth.user.id,
+        passengerId: auth.id,
         pickupAddress: data.pickupAddress,
         pickupLat: data.pickupLat,
         pickupLng: data.pickupLng,

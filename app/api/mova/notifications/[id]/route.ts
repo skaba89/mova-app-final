@@ -33,7 +33,7 @@ export async function PATCH(
     }
 
     // Verification de l'appartenance
-    if (notification.userId !== auth.user.id && auth.user.role !== 'admin') {
+    if (notification.userId !== auth.id && auth.role !== 'admin') {
       return NextResponse.json(
         { success: false, error: 'Acces refuse a cette notification' },
         { status: 403 }

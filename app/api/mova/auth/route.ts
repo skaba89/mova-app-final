@@ -146,11 +146,8 @@ export async function POST(request: NextRequest) {
     // Action: profil courant
     if (data.action === 'me') {
       const auth = await validateRequest(request);
-      if (!auth) {
-        return NextResponse.json(
-          { success: false, error: 'Authentification requise' },
-          { status: 401 }
-        );
+      if (!auth.success) {
+        return auth.response;
       }
 
       const user = await db.user.findUnique({

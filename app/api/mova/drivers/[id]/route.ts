@@ -29,6 +29,7 @@ export async function GET(
 ) {
   try {
     const auth = await requireAuth(request);
+    if (auth instanceof NextResponse) return auth;
     const { id } = await params;
 
     const driver = await db.user.findUnique({
@@ -122,6 +123,7 @@ export async function PATCH(
     // Seuls admin et gestionnaire_flotte peuvent modifier un chauffeur
     const roleChecker = requireRole(['admin', 'gestionnaire_flotte']);
     const auth = await roleChecker(request);
+    if (auth instanceof NextResponse) return auth;
     const { id } = await params;
     const body = await request.json();
 

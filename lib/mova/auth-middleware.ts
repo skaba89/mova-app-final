@@ -4,6 +4,16 @@ import { jwtVerify } from 'jose'
 // Types d'utilisateurs autorises
 export type UserRole = 'admin' | 'driver' | 'user' | 'vendor' | 'operator'
 
+// Classe d'erreur d'authentification (utilisee par les routes API)
+export class AuthError extends Error {
+  statusCode: number
+  constructor(message: string, statusCode: number = 401) {
+    super(message)
+    this.name = 'AuthError'
+    this.statusCode = statusCode
+  }
+}
+
 // Structure de l'utilisateur extrait du JWT
 export interface AuthUser {
   id: string

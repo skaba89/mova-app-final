@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
     const unreadOnly = searchParams.get('unreadOnly') === 'true';
 
     const where: Record<string, unknown> = {
-      userId: auth.user.id,
+      userId: auth.id,
     };
 
     if (unreadOnly) {
@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
     // Compter le total des non-lues (toutes les pages)
     const unreadCount = await db.notification.count({
       where: {
-        userId: auth.user.id,
+        userId: auth.id,
         isRead: false,
       },
     });
@@ -95,9 +95,9 @@ export async function POST(request: NextRequest) {
 
     // L'admin peut envoyer a n'importe quel utilisateur
     // Les utilisateurs normaux ne peuvent envoyer qu'a eux-memes
-    const targetUserId = (auth.user.role === 'admin' && userId)
+    const targetUserId = (auth.role === 'admin' && userId)
       ? userId
-      : auth.user.id;
+      : auth.id;
 
     const notification = await db.notification.create({
       data: {

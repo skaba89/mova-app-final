@@ -131,7 +131,25 @@ export const VEHICLE_FARES: Record<string, VehicleFare> = {
     perKm: 500,
     minimumFare: 2000,
   },
-  // Taxi classique
+  // Taxi classique (auto)
+  auto: {
+    basePrice: 5000,
+    perKm: 800,
+    minimumFare: 5000,
+  },
+  // Van spacieux
+  van: {
+    basePrice: 7000,
+    perKm: 1000,
+    minimumFare: 7000,
+  },
+  // Premium haut de gamme
+  premium: {
+    basePrice: 10000,
+    perKm: 1500,
+    minimumFare: 10000,
+  },
+  // Taxi classique (alias)
   taxi: {
     basePrice: 5000,
     perKm: 800,
@@ -200,4 +218,33 @@ export function getFare(fromZone: string, toZone: string, vehicleType: string): 
   // Calcul : prix de base + distance * prix/km, avec un minimum
   const calculatedFare = fare.basePrice + fare.perKm * distance
   return Math.round(Math.max(calculatedFare, fare.minimumFare))
+}
+
+// Interface pour le resultat de l'estimation complete
+export interface FareEstimate {
+  fareAmount: number
+  distanceKm: number
+  durationMinutes: number
+  currency: string
+}
+
+// Estimer le tarif complet entre deux zones (utilise par les API rides et fare)
+export function estimateFare(
+  pickupZone: string,
+  dropoffZone: string,
+  vehicleType: string = 'auto'
+): FareEstimate {
+  const distanceKm = getDistance(pickupZone, dropoffZone)
+  const fareAmount = getFare(pickupZone, dropoffZone, vehicleType)
+
+  // Estimation de la duree : ~2 min par km en ville, 1.5 min/km hors ville
+  const avgSpeedKmH = distanceKm <= 10 ? 25 : 40
+  const durationMinutes = Math.max(5, Math.round((distanceKm / avgSpeedKmH) * 60))
+
+  return {
+    fareAmount,
+    distanceKm,
+    durationMinutes,
+    currency: 'GNF',
+  }
 }

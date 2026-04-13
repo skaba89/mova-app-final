@@ -17,6 +17,7 @@ function convertDecimalFields(obj: Record<string, unknown>, fields: string[]): R
 export async function GET(request: NextRequest) {
   try {
     const auth = await requireAuth(request);
+    if (auth instanceof NextResponse) return auth;
     const { searchParams } = new URL(request.url);
 
     const zone = searchParams.get('zone');

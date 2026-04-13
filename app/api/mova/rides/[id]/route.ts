@@ -86,9 +86,9 @@ export async function GET(
     }
 
     // Verification des droits : passager, chauffeur ou admin
-    const isPassenger = ride.passengerId === auth.user.id;
-    const isDriver = ride.driverId === auth.user.id;
-    const isAdmin = auth.user.role === 'admin';
+    const isPassenger = ride.passengerId === auth.id;
+    const isDriver = ride.driverId === auth.id;
+    const isAdmin = auth.role === 'admin';
 
     if (!isPassenger && !isDriver && !isAdmin) {
       return NextResponse.json(
@@ -152,9 +152,9 @@ export async function PATCH(
     }
 
     // Verification des droits
-    const isPassenger = existingRide.passengerId === auth.user.id;
-    const isDriver = existingRide.driverId === auth.user.id;
-    const isAdmin = auth.user.role === 'admin';
+    const isPassenger = existingRide.passengerId === auth.id;
+    const isDriver = existingRide.driverId === auth.id;
+    const isAdmin = auth.role === 'admin';
 
     if (!isPassenger && !isDriver && !isAdmin) {
       return NextResponse.json(
@@ -185,7 +185,7 @@ export async function PATCH(
             { status: 400 }
           );
         }
-        updateData.driverId = auth.user.id;
+        updateData.driverId = auth.id;
         updateData.status = 'accepted';
         updateData.acceptedAt = new Date();
       }

@@ -32,13 +32,13 @@ export async function GET(request: NextRequest) {
 
     // Recuperer ou creer le portefeuille
     let wallet = await db.wallet.findUnique({
-      where: { userId: auth.user.id },
+      where: { userId: auth.id },
     });
 
     if (!wallet) {
       wallet = await db.wallet.create({
         data: {
-          userId: auth.user.id,
+          userId: auth.id,
           balance: 0,
           currency: 'GNF',
         },
@@ -111,13 +111,13 @@ export async function POST(request: NextRequest) {
 
     // Recuperer ou creer le portefeuille
     let wallet = await db.wallet.findUnique({
-      where: { userId: auth.user.id },
+      where: { userId: auth.id },
     });
 
     if (!wallet) {
       wallet = await db.wallet.create({
         data: {
-          userId: auth.user.id,
+          userId: auth.id,
           balance: 0,
           currency: 'GNF',
         },

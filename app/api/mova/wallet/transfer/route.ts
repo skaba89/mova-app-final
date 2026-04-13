@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { toUserId, amount } = parsed.data;
-    const fromUserId = auth.user.id; // Toujours utiliser l'ID de l'utilisateur authentifie
+    const fromUserId = auth.id; // Toujours utiliser l'ID de l'utilisateur authentifie
 
     // Interdiction de se transferer a soi-meme
     if (fromUserId === toUserId) {
