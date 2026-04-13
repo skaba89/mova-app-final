@@ -1,0 +1,9 @@
+# Force LF line endings for all text files (prevents CRLF issues in Docker/Linux)
+* text=auto eol=lf
+
+# Shell scripts must always use LF
+*.sh text eol=lf
+
+# Windows-specific files can use CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf

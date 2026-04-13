@@ -1,25 +1,16 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// MOVA — Service Worker v2
+// MOVA — Service Worker v3
 // Super-app de mobilite pour Conakry, Guinee
 // Caching strategies: precache, network-first, stale-while-revalidate
 // Push notifications, background sync, offline fallback
 // ═══════════════════════════════════════════════════════════════════════════
 
-const CACHE_NAME = 'mova-v2';
+const CACHE_NAME = 'mova-v3';
 
 // ─── Precache: critical assets fetched on install ────────────────────────
 const PRECACHE_ASSETS = [
   '/',
   '/manifest.json',
-  '/icons/icon-192x192.png',
-  '/icons/icon-512x512.png',
-  '/icons/icon.svg',
-];
-
-// Google Fonts to precache
-const GOOGLE_FONTS = [
-  'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap',
-  'https://fonts.gstatic.com/s/inter/v18/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuLyfAZ9hiJ-Ek-_EeA.woff2',
 ];
 
 // ─── Cache TTL for API responses (5 minutes) ─────────────────────────────
@@ -124,25 +115,16 @@ const OFFLINE_PAGE = `<!DOCTYPE html>
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      // Precache static assets — ignore failures for fonts (network-dependent)
-      const staticPromise = cache.addAll(PRECACHE_ASSETS).catch((err) => {
+      return cache.addAll(PRECACHE_ASSETS).catch((err) => {
         console.warn('[SW] Precache: certaines ressources statiques ont echoue', err);
       });
-
-      const fontPromises = GOOGLE_FONTS.map((url) =>
-        cache.add(url).catch((err) => {
-          console.warn(`[SW] Precache: echec du cache pour ${url}`, err);
-        })
-      );
-
-      return Promise.all([staticPromise, ...fontPromises]);
     })
   );
   self.skipWaiting();
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// ACTIVATE EVENT — Clean up old caches
+// ACTIVATE EVENT — Clean up ALL old caches (force fresh start)
 // ═══════════════════════════════════════════════════════════════════════════
 self.addEventListener('activate', (event) => {
   event.waitUntil(
@@ -180,27 +162,25 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // ─── Strategy 2: Cache-first for precache assets ─────────────────────
-  if (isPrecacheAsset(url)) {
-    event.respondWith(cacheFirst(request));
+  // ─── Strategy 2: Network-first for Next.js static assets ─────────────
+  // Content-hashed files: always fetch from network to get latest after deploy
+  if (url.pathname.startsWith('/_next/static/')) {
+    event.respondWith(networkFirstWithCache(request));
     return;
   }
 
-  // ─── Strategy 3: Stale-while-revalidate for everything else ──────────
+  // ─── Strategy 3: Network-first for navigation requests (/) ───────────
+  if (request.mode === 'navigate') {
+    event.respondWith(networkFirstWithCache(request));
+    return;
+  }
+
+  // ─── Strategy 4: Stale-while-revalidate for other static assets ──────
   event.respondWith(staleWhileRevalidate(request));
 });
 
-// ─── Determine if a URL is a precache asset ──────────────────────────────
-function isPrecacheAsset(url) {
-  const precachePaths = ['/', '/manifest.json', '/icons/'];
-  return precachePaths.some((path) => url.pathname === path || url.pathname.startsWith(path));
-}
-
-// ─── Strategy: Cache-first (for precache assets) ─────────────────────────
-async function cacheFirst(request) {
-  const cached = await caches.match(request);
-  if (cached) return cached;
-
+// ─── Strategy: Network-first with cache fallback ────────────────────────
+async function networkFirstWithCache(request) {
   try {
     const response = await fetch(request);
     if (response.ok) {
@@ -209,7 +189,9 @@ async function cacheFirst(request) {
     }
     return response;
   } catch (error) {
-    // If navigation request fails, show offline page
+    const cached = await caches.match(request);
+    if (cached) return cached;
+
     if (request.mode === 'navigate') {
       return new Response(OFFLINE_PAGE, {
         headers: { 'Content-Type': 'text/html; charset=utf-8' },
@@ -225,11 +207,9 @@ async function networkFirst(request) {
     const response = await fetch(request);
 
     if (response.ok) {
-      // Cache successful API responses with TTL metadata
       const cache = await caches.open(CACHE_NAME);
       const responseToCache = response.clone();
 
-      // Add custom header to track cache time
       const headers = new Headers(responseToCache.headers);
       headers.set('sw-cache-timestamp', Date.now().toString());
 
@@ -244,11 +224,9 @@ async function networkFirst(request) {
 
     return response;
   } catch (error) {
-    // Fallback to cache if network fails
     const cached = await caches.match(request);
 
     if (cached) {
-      // Check TTL — only serve if cached within the last 5 minutes
       const timestamp = cached.headers.get('sw-cache-timestamp');
       if (timestamp) {
         const age = Date.now() - parseInt(timestamp, 10);
@@ -259,7 +237,6 @@ async function networkFirst(request) {
       return cached;
     }
 
-    // No cache, no network — return error response
     return new Response(
       JSON.stringify({
         success: false,
@@ -278,7 +255,6 @@ async function staleWhileRevalidate(request) {
   const cache = await caches.open(CACHE_NAME);
   const cached = await cache.match(request);
 
-  // Serve from cache immediately, then update in background
   const fetchPromise = fetch(request)
     .then((response) => {
       if (response.ok) {
@@ -319,7 +295,6 @@ self.addEventListener('push', (event) => {
         actions: parsed.actions || [],
       };
     } catch (e) {
-      // If not JSON, use text as body
       data.body = event.data.text() || data.body;
     }
   }
@@ -337,7 +312,6 @@ self.addEventListener('push', (event) => {
 
   event.waitUntil(
     self.registration.showNotification(data.title, options).then(() => {
-      // Auto-close notifications after 5 seconds (unless requireInteraction)
       if (!options.requireInteraction) {
         setTimeout(() => {
           self.registration.getNotifications().then((notifications) => {
@@ -363,10 +337,8 @@ self.addEventListener('notificationclick', (event) => {
 
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      // If the app is already open, focus it
       for (const client of clientList) {
         if (client.url.includes(self.location.origin) && 'focus' in client) {
-          // Navigate to the specific URL if provided
           if (event.notification.data?.url) {
             client.navigate(urlToOpen);
           }
@@ -374,7 +346,6 @@ self.addEventListener('notificationclick', (event) => {
         }
       }
 
-      // Otherwise, open a new window
       if (self.clients.openWindow) {
         return self.clients.openWindow(urlToOpen);
       }
@@ -395,7 +366,6 @@ self.addEventListener('sync', (event) => {
 // ─── Wallet sync implementation ──────────────────────────────────────────
 async function syncWalletOperations() {
   try {
-    // Open IndexedDB to get pending wallet operations
     const db = await openWalletDB();
     if (!db) {
       console.warn('[SW] Base de donnees portefeuille indisponible');
@@ -413,7 +383,6 @@ async function syncWalletOperations() {
 
     console.log(`[SW] ${allPending.length} operation(s) de portefeuille a synchroniser`);
 
-    // Process each pending operation
     for (const operation of allPending) {
       try {
         const response = await fetch(operation.url, {
@@ -426,7 +395,6 @@ async function syncWalletOperations() {
         });
 
         if (response.ok) {
-          // Remove successfully synced operation
           const deleteTx = db.transaction('pending-operations', 'readwrite');
           deleteTx.objectStore('pending-operations').delete(operation.id);
           console.log(`[SW] Operation synchronisee: ${operation.id}`);
@@ -466,5 +434,3 @@ function openWalletDB() {
     };
   });
 }
-
-

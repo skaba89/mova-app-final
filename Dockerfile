@@ -18,6 +18,12 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 RUN bun run build
 
+# Verify static files were copied into standalone correctly
+RUN echo "=== Static files in standalone ===" && \
+    ls -la .next/standalone/.next/static/chunks/ 2>/dev/null && \
+    echo "=== Chunk count ===" && \
+    ls .next/standalone/.next/static/chunks/ 2>/dev/null | wc -l
+
 # ─── Stage 2: Production ──────────────────────────────────────────────────
 FROM node:20-slim AS production
 
@@ -31,6 +37,13 @@ RUN groupadd -r mova && useradd -r -g mova -d /app mova
 
 # Copy standalone build
 COPY --from=builder /app/.next/standalone ./
+
+# Verify standalone has static files (from build script cp)
+RUN echo "=== Verifying static files ===" && \
+    ls .next/static/chunks/ 2>/dev/null && \
+    echo "Static files OK: $(ls .next/static/chunks/ 2>/dev/null | wc -l) chunks"
+
+# Also copy original static as fallback (in case build script cp was partial)
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
 
