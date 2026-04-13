@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useMovaStore } from '@/lib/store'
+import { apiFetch } from '@/lib/api'
 import {
   ArrowLeft,
   MapPin,
@@ -100,13 +101,12 @@ export function CarpoolView() {
   const fetchRides = useCallback(async () => {
     setIsLoading(true)
     try {
-      const token = localStorage.getItem('mova_token')
-      const res = await fetch('/api/mova/carpool', {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      })
-      const data = await res.json()
-      if (data.success && data.data?.rides) {
-        setRides(data.data.rides)
+      const res = await apiFetch('/api/mova/carpool')
+      if (res.ok) {
+        const data = await res.json()
+        if (data.success && data.data?.rides) {
+          setRides(data.data.rides)
+        }
       }
     } catch {
       // Silencieux
@@ -151,13 +151,8 @@ export function CarpoolView() {
     setSuccess('')
 
     try {
-      const token = localStorage.getItem('mova_token')
-      const res = await fetch('/api/mova/carpool', {
+      const res = await apiFetch('/api/mova/carpool', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
         body: JSON.stringify({
           pickupAddress: pickupAddress.trim() || pickupZone,
           pickupLat: 0,

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useMovaStore } from '@/lib/store'
+import { apiFetch } from '@/lib/api'
 import {
   ArrowLeft,
   Plus,
@@ -197,16 +198,8 @@ export function FoodCartView() {
         paymentMethod: selectedPayment,
       }
 
-      const token =
-        typeof window !== 'undefined' ? localStorage.getItem('mova_token') : null
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`
-      }
-
-      const res = await fetch('/api/mova/food', {
+      const res = await apiFetch('/api/mova/food', {
         method: 'POST',
-        headers,
         body: JSON.stringify(payload),
       })
 

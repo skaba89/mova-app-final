@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useMovaStore } from '@/lib/store'
+import { apiFetch } from '@/lib/api'
 import {
   Search,
   MapPin,
@@ -222,15 +223,7 @@ export function FoodView() {
         params.set('search', searchParts.join(' '))
       }
 
-      const token = typeof window !== 'undefined' ? localStorage.getItem('mova_token') : null
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`
-      }
-
-      const res = await fetch(`/api/mova/food/restaurants?${params.toString()}`, {
-        headers,
-      })
+      const res = await apiFetch(`/api/mova/food/restaurants?${params.toString()}`)
 
       if (!res.ok) {
         throw new Error(`Erreur ${res.status}: ${res.statusText}`)

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useMovaStore } from '@/lib/store'
+import { apiFetch } from '@/lib/api'
 import {
   ArrowLeft,
   Trophy,
@@ -130,17 +131,16 @@ export function LoyaltyView() {
   useEffect(() => {
     async function fetchData() {
       try {
-        const token = localStorage.getItem('mova_token')
-        const res = await fetch('/api/mova/loyalty', {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        })
-        const data = await res.json()
+        const res = await apiFetch('/api/mova/loyalty')
+        if (res.ok) {
+          const data = await res.json()
 
-        if (data.success && data.data) {
-          setProfile(data.data.profile)
-          setTransactions(data.data.transactions || [])
-        } else {
-          setError(data.error || 'Erreur de chargement')
+          if (data.success && data.data) {
+            setProfile(data.data.profile)
+            setTransactions(data.data.transactions || [])
+          } else {
+            setError(data.error || 'Erreur de chargement')
+          }
         }
       } catch {
         setError('Erreur de connexion au serveur')

@@ -48,14 +48,34 @@ export function AuthView() {
     const token = localStorage.getItem('mova_token')
     const savedUser = localStorage.getItem('mova_user')
     if (token && savedUser) {
-      try {
-        const user: MovaUser = JSON.parse(savedUser)
-        setUser(user)
-        setCurrentView('hub')
-      } catch {
-        localStorage.removeItem('mova_token')
-        localStorage.removeItem('mova_user')
-      }
+      // Valider le token aupres du serveur avant de restaurer la session
+      fetch('/api/mova/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ action: 'me' }),
+      })
+        .then((res) => {
+          if (!res.ok) throw new Error('Token invalide')
+          return res.json()
+        })
+        .then((data) => {
+          if (data.success && data.data?.user) {
+            setUser({
+              id: data.data.user.id,
+              name: data.data.user.name,
+              email: data.data.user.email,
+              role: data.data.user.role,
+              phone: data.data.user.phone,
+            })
+            setCurrentView('hub')
+          } else {
+            throw new Error('Token invalide')
+          }
+        })
+        .catch(() => {
+          localStorage.removeItem('mova_token')
+          localStorage.removeItem('mova_user')
+        })
     }
   }, [setUser, setCurrentView])
 

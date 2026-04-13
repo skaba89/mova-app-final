@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useMovaStore } from '@/lib/store'
+import { apiFetch } from '@/lib/api'
 import {
   ArrowLeft,
   MapPin,
@@ -142,13 +143,12 @@ export function DeliveriesView() {
   const fetchDeliveries = useCallback(async () => {
     setIsLoadingDeliveries(true)
     try {
-      const token = localStorage.getItem('mova_token')
-      const res = await fetch('/api/mova/deliveries?status=pending,accepted,picked_up,in_transit', {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      })
-      const data = await res.json()
-      if (data.success && data.data?.deliveries) {
-        setDeliveries(data.data.deliveries)
+      const res = await apiFetch('/api/mova/deliveries?status=pending,accepted,picked_up,in_transit')
+      if (res.ok) {
+        const data = await res.json()
+        if (data.success && data.data?.deliveries) {
+          setDeliveries(data.data.deliveries)
+        }
       }
     } catch {
       // Silencieux
@@ -203,13 +203,8 @@ export function DeliveriesView() {
     setSuccess('')
 
     try {
-      const token = localStorage.getItem('mova_token')
-      const res = await fetch('/api/mova/deliveries', {
+      const res = await apiFetch('/api/mova/deliveries', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
         body: JSON.stringify({
           packageType,
           pickupAddress: pickupAddress.trim() || pickupZone,

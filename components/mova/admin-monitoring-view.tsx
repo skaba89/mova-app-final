@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useMovaStore } from '@/lib/store'
+import { apiFetch } from '@/lib/api'
 import {
   ArrowLeft,
   Activity,
@@ -152,10 +153,7 @@ export function AdminMonitoringView() {
 
   const fetchMonitoring = useCallback(async () => {
     try {
-      const token = localStorage.getItem('mova_token')
-      const res = await fetch('/api/mova/admin/monitoring', {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      })
+      const res = await apiFetch('/api/mova/admin/monitoring')
 
       if (res.ok) {
         const data = await res.json()

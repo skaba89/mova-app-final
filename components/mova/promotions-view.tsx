@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useMovaStore } from '@/lib/store'
+import { apiFetch } from '@/lib/api'
 import {
   ArrowLeft,
   Gift,
@@ -92,13 +93,8 @@ export function PromotionsView() {
     setApplySuccess('')
 
     try {
-      const token = localStorage.getItem('mova_token')
-      const res = await fetch('/api/mova/promotions', {
+      const res = await apiFetch('/api/mova/promotions', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
         body: JSON.stringify({ code: promoCode.trim().toUpperCase() }),
       })
 

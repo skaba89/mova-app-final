@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useMovaStore } from '@/lib/store'
+import { apiFetch } from '@/lib/api'
 import {
   ArrowLeft,
   Bell,
@@ -74,20 +75,17 @@ export function NotificationsView() {
   const [isLoading, setIsLoading] = useState(true)
   const [isMarkingAll, setIsMarkingAll] = useState(false)
 
-  const getToken = () => localStorage.getItem('mova_token')
-
   // Charger les notifications
   const fetchNotifications = useCallback(async () => {
     setIsLoading(true)
     try {
-      const token = getToken()
-      const res = await fetch('/api/mova/notifications?limit=50', {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      })
-      const data = await res.json()
-      if (data.success) {
-        setNotifications(data.data.notifications || [])
-        setUnreadCount(data.data.unreadCount || 0)
+      const res = await apiFetch('/api/mova/notifications?limit=50')
+      if (res.ok) {
+        const data = await res.json()
+        if (data.success) {
+          setNotifications(data.data.notifications || [])
+          setUnreadCount(data.data.unreadCount || 0)
+        }
       }
     } catch {
       // Silencieux
@@ -103,13 +101,8 @@ export function NotificationsView() {
   // Marquer une notification comme lue
   const markAsRead = async (notificationId: string) => {
     try {
-      const token = getToken()
-      await fetch(`/api/mova/notifications/${notificationId}`, {
+      await apiFetch(`/api/mova/notifications/${notificationId}`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
         body: JSON.stringify({ isRead: true }),
       })
 
@@ -127,13 +120,8 @@ export function NotificationsView() {
   const markAllAsRead = async () => {
     setIsMarkingAll(true)
     try {
-      const token = getToken()
-      await fetch('/api/mova/notifications/read-all', {
+      await apiFetch('/api/mova/notifications/read-all', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
       })
 
       setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })))

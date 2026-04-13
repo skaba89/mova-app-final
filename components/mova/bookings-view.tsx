@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useMovaStore } from '@/lib/store'
+import { apiFetch } from '@/lib/api'
 import {
   ArrowLeft,
   MapPin,
@@ -119,13 +120,12 @@ export function BookingsView() {
   const fetchBookings = useCallback(async () => {
     setIsLoadingBookings(true)
     try {
-      const token = localStorage.getItem('mova_token')
-      const res = await fetch('/api/mova/bookings', {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      })
-      const data = await res.json()
-      if (data.success && data.data?.bookings) {
-        setBookings(data.data.bookings)
+      const res = await apiFetch('/api/mova/bookings')
+      if (res.ok) {
+        const data = await res.json()
+        if (data.success && data.data?.bookings) {
+          setBookings(data.data.bookings)
+        }
       }
     } catch {
       // Silencieux
@@ -180,13 +180,8 @@ export function BookingsView() {
     const scheduledAt = new Date(`${scheduledDate}T${scheduledTime}`)
 
     try {
-      const token = localStorage.getItem('mova_token')
-      const res = await fetch('/api/mova/bookings', {
+      const res = await apiFetch('/api/mova/bookings', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
         body: JSON.stringify({
           vehicleType,
           pickupAddress: pickupAddress.trim() || pickupZone,
@@ -223,13 +218,8 @@ export function BookingsView() {
   // Annuler une reservation
   const handleCancel = async (bookingId: string) => {
     try {
-      const token = localStorage.getItem('mova_token')
-      const res = await fetch(`/api/mova/bookings/${bookingId}`, {
+      const res = await apiFetch(`/api/mova/bookings/${bookingId}`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
         body: JSON.stringify({ status: 'cancelled' }),
       })
       if (res.ok) {

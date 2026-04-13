@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useMovaStore } from '@/lib/store'
+import { apiFetch } from '@/lib/api'
 import {
   ArrowLeft,
   Users,
@@ -67,18 +68,17 @@ export function ReferralsView() {
   useEffect(() => {
     async function fetchData() {
       try {
-        const token = localStorage.getItem('mova_token')
-        const res = await fetch('/api/mova/referrals', {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        })
-        const data = await res.json()
+        const res = await apiFetch('/api/mova/referrals')
+        if (res.ok) {
+          const data = await res.json()
 
-        if (data.success && data.data) {
-          setReferralCode(data.data.referralCode || '')
-          setStats(data.data.stats || { total: 0, completed: 0, totalEarnings: 0 })
-          setReferrals(data.data.referrals || [])
-        } else {
-          setError(data.error || 'Erreur de chargement')
+          if (data.success && data.data) {
+            setReferralCode(data.data.referralCode || '')
+            setStats(data.data.stats || { total: 0, completed: 0, totalEarnings: 0 })
+            setReferrals(data.data.referrals || [])
+          } else {
+            setError(data.error || 'Erreur de chargement')
+          }
         }
       } catch {
         setError('Erreur de connexion au serveur')
@@ -116,13 +116,8 @@ export function ReferralsView() {
     setApplyMessage(null)
 
     try {
-      const token = localStorage.getItem('mova_token')
-      const res = await fetch('/api/mova/referrals', {
+      const res = await apiFetch('/api/mova/referrals', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
         body: JSON.stringify({ code: inputCode.trim().toUpperCase() }),
       })
 

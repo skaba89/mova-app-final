@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useMovaStore } from '@/lib/store'
+import { apiFetch } from '@/lib/api'
 import {
   ArrowLeft,
   Clock,
@@ -249,14 +250,7 @@ export function FoodTrackingView() {
     }
 
     try {
-      const token =
-        typeof window !== 'undefined' ? localStorage.getItem('mova_token') : null
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`
-      }
-
-      const res = await fetch(`/api/mova/food/${orderId}`, { headers })
+      const res = await apiFetch(`/api/mova/food/${orderId}`)
 
       if (!res.ok) {
         if (res.status === 404) {

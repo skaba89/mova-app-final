@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useMovaStore } from '@/lib/store'
+import { apiFetch } from '@/lib/api'
 import {
   ArrowLeft,
   MapPin,
@@ -182,13 +183,12 @@ export function RidesView() {
   const fetchActiveRides = useCallback(async () => {
     setIsLoadingRides(true)
     try {
-      const token = localStorage.getItem('mova_token')
-      const res = await fetch('/api/mova/rides?status=requested,accepted,in_progress', {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      })
-      const data = await res.json()
-      if (data.success && data.data?.rides) {
-        setActiveRides(data.data.rides)
+      const res = await apiFetch('/api/mova/rides?status=requested,accepted,in_progress')
+      if (res.ok) {
+        const data = await res.json()
+        if (data.success && data.data?.rides) {
+          setActiveRides(data.data.rides)
+        }
       }
     } catch {
       // Silencieux
@@ -250,13 +250,8 @@ export function RidesView() {
     setSuccess('')
 
     try {
-      const token = localStorage.getItem('mova_token')
-      const res = await fetch('/api/mova/rides', {
+      const res = await apiFetch('/api/mova/rides', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
         body: JSON.stringify({
           pickupAddress: pickupAddress.trim(),
           pickupLat: 0,

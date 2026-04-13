@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useMovaStore } from '@/lib/store'
+import { apiFetch } from '@/lib/api'
 import {
   ArrowLeft,
   Plus,
@@ -113,20 +114,17 @@ export function WalletView() {
   // Transactions : afficher plus
   const [showAllTransactions, setShowAllTransactions] = useState(false)
 
-  const getToken = () => localStorage.getItem('mova_token')
-
   // Charger les donnees du portefeuille
   const fetchWallet = useCallback(async () => {
     setIsLoading(true)
     try {
-      const token = getToken()
-      const res = await fetch('/api/mova/wallet?limit=50', {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      })
-      const data = await res.json()
-      if (data.success) {
-        setWallet(data.data.wallet)
-        setTransactions(data.data.transactions || [])
+      const res = await apiFetch('/api/mova/wallet?limit=50')
+      if (res.ok) {
+        const data = await res.json()
+        if (data.success) {
+          setWallet(data.data.wallet)
+          setTransactions(data.data.transactions || [])
+        }
       }
     } catch {
       // Silencieux
@@ -152,13 +150,8 @@ export function WalletView() {
     setTopUpSuccess('')
 
     try {
-      const token = getToken()
-      const res = await fetch('/api/mova/wallet', {
+      const res = await apiFetch('/api/mova/wallet', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
         body: JSON.stringify({
           action: 'top_up',
           amount,
@@ -199,13 +192,8 @@ export function WalletView() {
     setTransferSuccess('')
 
     try {
-      const token = getToken()
-      const res = await fetch('/api/mova/wallet/transfer', {
+      const res = await apiFetch('/api/mova/wallet/transfer', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
         body: JSON.stringify({
           toUserId: transferTo.trim(),
           amount,
