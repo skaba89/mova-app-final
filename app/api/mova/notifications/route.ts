@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { requireAuth, AuthError } from '@/lib/mova/auth-middleware';
+import { Prisma } from '@prisma/client';
 import { z } from 'zod/v4';
 
 const createNotificationSchema = z.object({
@@ -107,7 +108,7 @@ export async function POST(request: NextRequest) {
         type,
         title,
         message,
-        ...(data ? { data } : {}),
+        ...(data ? { data: data as Prisma.InputJsonValue } : {}),
       },
     });
 

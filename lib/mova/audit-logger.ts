@@ -54,7 +54,7 @@ export async function logAction(params: LogActionParams): Promise<void> {
         resource: params.resource,
         resourceId: params.resourceId ?? null,
         severity: params.severity ?? 'info',
-        ...(params.details ? { details: params.details } : {}),
+        ...(params.details ? { details: params.details as Prisma.InputJsonValue } : {}),
       },
     })
   } catch (error) {

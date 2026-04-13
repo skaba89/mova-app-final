@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/mova/auth-middleware'
+import { Prisma } from '@prisma/client'
 import db from '@/lib/db'
 import { z } from 'zod/v4'
 
@@ -186,7 +187,7 @@ export async function POST(request: NextRequest) {
           customerId: auth.id,
           restaurantId: data.restaurantId,
           status: 'pending',
-          items: orderItems,
+          items: orderItems as Prisma.InputJsonValue,
           subtotal,
           deliveryFee,
           serviceFee,
