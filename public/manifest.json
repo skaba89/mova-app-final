@@ -1,0 +1,98 @@
+{
+  "name": "MOVA — Mobilite Conakry",
+  "short_name": "MOVA",
+  "description": "Super-app de mobilite pour Conakry, Guinee - Courses, livraisons, covoiturage",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#059669",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "lang": "fr",
+  "dir": "ltr",
+  "categories": ["transport", "lifestyle", "business", "utilities", "social"],
+  "icons": [
+    {
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshots/narrow.png",
+      "sizes": "540x720",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "MOVA - Ecran principal"
+    },
+    {
+      "src": "/screenshots/wide.png",
+      "sizes": "1080x1920",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "MOVA - Vue complete"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Reserver une course",
+      "short_name": "Course",
+      "url": "/?action=ride",
+      "description": "Reserver un VTC",
+      "icons": [
+        {
+          "src": "/icons/icon-192x192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Portefeuille",
+      "short_name": "Portefeuille",
+      "url": "/?action=wallet",
+      "description": "Gerer votre portefeuille et paiements",
+      "icons": [
+        {
+          "src": "/icons/icon-192x192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Livraison",
+      "short_name": "Livrer",
+      "url": "/?action=delivery",
+      "description": "Envoyer un colis",
+      "icons": [
+        {
+          "src": "/icons/icon-192x192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ],
+  "protocol_handlers": [
+    {
+      "protocol": "tel",
+      "url": "/?action=call&phone=%s"
+    }
+  ],
+  "share_target": {
+    "action": "/?action=share",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  }
+}

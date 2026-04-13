@@ -1,0 +1,514 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  phone         String    @unique
+  password      String    @default("")
+  role          String    @default("passenger") // passenger, driver, admin
+  avatar        String?
+  isOnline      Boolean   @default(false)
+  rating        Float     @default(5.0)
+  totalRides    Int       @default(0)
+  currentLat    Float?
+  currentLng    Float?
+  zone          String?   // Conakry zones: Dixinn, Kaloum, Matam, Matoto, Ratoma
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  ridesAsPassenger Ride[]  @relation("PassengerRides")
+  ridesAsDriver    Ride[]  @relation("DriverRides")
+  vehicles         Vehicle[]
+  payments         Payment[]
+
+  // WALLET & PROMOTIONS
+  wallet            Wallet?
+  redemptions       Redemption[]      @relation("UserRedemptions")
+
+  // REFERRALS
+  referralsMade     Referral[]        @relation("Referrer")
+  referral          Referral?         @relation("Referred")
+
+  // SUBSCRIPTIONS
+  subscriptions     Subscription[]    @relation("UserSubscriptions")
+
+  // BOOKINGS
+  bookings          Booking[]         @relation("PassengerBookings")
+
+  // DELIVERIES
+  sentDeliveries    Delivery[]        @relation("SenderDeliveries")
+  courierJobs       Delivery[]        @relation("CourierDeliveries")
+  deliveryPayments  DeliveryPayment[]
+
+  // B2B / CORPORATE
+  businessEmployees BusinessEmployee[] @relation("BusinessEmployees")
+
+  // LOYALTY
+  loyaltyAccount     LoyaltyAccount?
+
+  // NOTIFICATIONS
+  notifications      Notification[]
+
+  // INTERCITY
+  intercityRides    IntercityRide[]    @relation("PassengerIntercity")
+
+  // SCHOOL TRANSPORT
+  schoolSubscriptions SchoolTransport[] @relation("ParentSchoolTransport")
+}
+
+model Vehicle {
+  id          String   @id @default(cuid())
+  type        String   @default("standard") // standard, premium, van
+  brand       String
+  model       String
+  plate       String   @unique
+  color       String?
+  year        Int?
+  seats       Int      @default(4)
+  isActive    Boolean  @default(true)
+  driverId    String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  driver User @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  rides  Ride[]
+}
+
+model Ride {
+  id              String    @id @default(cuid())
+  status          String    @default("pending") // pending, accepted, in_progress, completed, cancelled
+  passengerId     String
+  driverId        String?
+  vehicleId       String?
+
+  pickupAddress   String
+  pickupLat       Float
+  pickupLng       Float
+  pickupZone      String
+
+  dropoffAddress  String
+  dropoffLat      Float
+  dropoffLng      Float
+  dropoffZone     String
+
+  estimatedFare   Float
+  actualFare      Float?
+  distance        Float?    // in km
+  duration        Int?      // in minutes
+
+  passengerRating Float?
+  driverRating    Float?
+  passengerNote   String?
+  driverNote      String?
+
+  startedAt       DateTime?
+  completedAt     DateTime?
+  cancelledAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  passenger User @relation("PassengerRides", fields: [passengerId], references: [id])
+  driver    User? @relation("DriverRides", fields: [driverId], references: [id])
+  vehicle   Vehicle? @relation(fields: [vehicleId], references: [id])
+
+  payments Payment[]
+}
+
+model Payment {
+  id            String   @id @default(cuid())
+  rideId        String
+  userId        String
+  amount        Float
+  method        String   @default("cash") // cash, mobile_money, card
+  status        String   @default("pending") // pending, completed, failed, refunded
+  reference     String?
+  provider      String?  // Orange Money, MTN, etc.
+  createdAt     DateTime @default(now())
+
+  ride  Ride  @relation(fields: [rideId], references: [id])
+  user  User  @relation(fields: [userId], references: [id])
+}
+
+model Zone {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  nameFr      String
+  lat         Float
+  lng         Float
+  radius      Float    @default(3.0) // km
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+}
+
+// ============ WALLET SYSTEM ============
+
+model Wallet {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  balance     Float    @default(0)
+  currency    String   @default("GNF")
+  isBlocked   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions WalletTransaction[]
+}
+
+model WalletTransaction {
+  id          String   @id @default(cuid())
+  walletId    String
+  type        String   // credit, debit, topup, withdrawal, transfer, cashback, referral_bonus
+  amount      Float
+  balance     Float    // balance after transaction
+  method      String?  // mobile_money, card, cash, system
+  provider    String?  // Orange Money, MTN
+  reference   String?  // external reference
+  description String
+  status      String   @default("completed") // pending, completed, failed
+  createdAt   DateTime @default(now())
+  wallet      Wallet   @relation(fields: [walletId], references: [id], onDelete: Cascade)
+}
+
+// ============ PROMOTIONS ============
+
+model Promotion {
+  id            String    @id @default(cuid())
+  code          String    @unique
+  title         String
+  description   String?
+  type          String    @default("percentage") // percentage, fixed, free_ride
+  value         Float     // 50 means 50% or 5000 GNF
+  minOrder      Float?    // minimum order amount
+  maxDiscount   Float?    // maximum discount cap
+  usageLimit    Int?      // total usage limit
+  usedCount     Int       @default(0)
+  perUserLimit  Int       @default(1)
+  startsAt      DateTime?
+  expiresAt     DateTime?
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  redemptions   Redemption[]
+}
+
+model Redemption {
+  id          String   @id @default(cuid())
+  promotionId String
+  userId      String
+  rideId      String?
+  savings     Float    // amount saved
+  createdAt   DateTime @default(now())
+  promotion   Promotion @relation(fields: [promotionId], references: [id])
+  user        User      @relation("UserRedemptions", fields: [userId], references: [id])
+}
+
+// ============ REFERRALS ============
+
+model Referral {
+  id            String   @id @default(cuid())
+  referrerId    String
+  referredId    String   @unique
+  code          String
+  reward        Float    @default(0)
+  status        String   @default("pending") // pending, completed
+  completedAt   DateTime?
+  createdAt     DateTime @default(now())
+  referrer      User     @relation("Referrer", fields: [referrerId], references: [id])
+  referred      User     @relation("Referred", fields: [referredId], references: [id])
+}
+
+// ============ SUBSCRIPTIONS ============
+
+model Subscription {
+  id          String   @id @default(cuid())
+  userId      String
+  plan        String   // essential, premium, business
+  status      String   @default("active") // active, cancelled, expired
+  price       Float
+  ridesLeft   Int      @default(0)
+  cashbackRate Float   @default(0)
+  startsAt    DateTime
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+  user        User     @relation("UserSubscriptions", fields: [userId], references: [id])
+}
+
+// ============ BOOKINGS (Scheduled rides) ============
+
+model Booking {
+  id              String    @id @default(cuid())
+  passengerId     String
+  vehicleType     String    @default("standard")
+  pickupAddress   String
+  pickupLat       Float
+  pickupLng       Float
+  pickupZone      String
+  dropoffAddress  String
+  dropoffLat      Float
+  dropoffLng      Float
+  dropoffZone     String
+  scheduledFor    DateTime
+  estimatedFare   Float
+  notes           String?
+  status          String    @default("scheduled") // scheduled, cancelled, converted
+  rideId          String?   // when converted to active ride
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  passenger       User      @relation("PassengerBookings", fields: [passengerId], references: [id])
+}
+
+// ============ DELIVERIES ============
+
+model Delivery {
+  id              String    @id @default(cuid())
+  status          String    @default("pending") // pending, picked_up, in_transit, near_delivery, delivered, cancelled
+  senderId        String
+  courierId       String?
+
+  pickupName      String
+  pickupPhone     String
+  pickupAddress   String
+  pickupLat       Float
+  pickupLng       Float
+  pickupZone      String
+  pickupNotes     String?
+
+  deliveryName    String
+  deliveryPhone   String
+  deliveryAddress String
+  deliveryLat     Float
+  deliveryLng     Float
+  deliveryZone    String
+  deliveryNotes   String?
+  deliveryOtp     String?
+
+  packageType     String    @default("package") // package, document, merchandise
+  packageSize     String    @default("medium") // small, medium, large, extra
+  weight          Float?
+  declaredValue   Float?
+
+  estimatedPrice  Float
+  actualPrice     Float?
+  distance        Float?
+  duration        Int?
+
+  pickupPhoto     String?   // proof of pickup
+  deliveryPhoto   String?   // proof of delivery
+
+  pickedUpAt      DateTime?
+  deliveredAt     DateTime?
+  cancelledAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  sender          User      @relation("SenderDeliveries", fields: [senderId], references: [id])
+  courier         User?     @relation("CourierDeliveries", fields: [courierId], references: [id])
+  payments        DeliveryPayment[]
+}
+
+model DeliveryPayment {
+  id            String   @id @default(cuid())
+  deliveryId    String
+  userId        String
+  amount        Float
+  method        String   @default("cash")
+  status        String   @default("pending")
+  createdAt     DateTime @default(now())
+  delivery      Delivery @relation(fields: [deliveryId], references: [id])
+  user          User      @relation(fields: [userId], references: [id])
+}
+
+// ============ B2B / CORPORATE ============
+
+model BusinessAccount {
+  id          String   @id @default(cuid())
+  name        String
+  siret       String?
+  address     String?
+  email       String
+  phone       String
+  logo        String?
+  plan        String   @default("starter") // starter, pro, enterprise
+  monthlyBudget Float?
+  status      String   @default("active")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  employees   BusinessEmployee[]
+  costCenters BusinessCostCenter[]
+}
+
+model BusinessEmployee {
+  id              String   @id @default(cuid())
+  businessId      String
+  userId          String   @unique
+  department      String?
+  position        String?
+  monthlyLimit    Float    @default(100000)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  business        BusinessAccount @relation(fields: [businessId], references: [id])
+  user            User      @relation("BusinessEmployees", fields: [userId], references: [id])
+}
+
+model BusinessCostCenter {
+  id          String   @id @default(cuid())
+  businessId  String
+  name        String
+  budget      Float
+  used        Float    @default(0)
+  manager     String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  business    BusinessAccount @relation(fields: [businessId], references: [id])
+}
+
+// ============ LOYALTY ============
+
+model LoyaltyAccount {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  points        Int      @default(0)
+  tier          String   @default("bronze") // bronze, argent, or, platine
+  totalEarned   Int      @default(0)
+  totalSpent    Int      @default(0)
+  ridesCount    Int      @default(0)
+  memberSince   DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions  LoyaltyTransaction[]
+}
+
+model LoyaltyTransaction {
+  id            String   @id @default(cuid())
+  loyaltyAccountId String
+  type          String   // earn, spend, bonus, adjustment
+  points        Int      // positive for earning, negative for spending
+  description   String
+  referenceType String?  // ride, delivery, promotion, referral
+  referenceId   String?
+  createdAt     DateTime @default(now())
+  loyaltyAccount LoyaltyAccount @relation(fields: [loyaltyAccountId], references: [id], onDelete: Cascade)
+}
+
+// ============ INCIDENTS ============
+
+model Incident {
+  id          String   @id @default(cuid())
+  rideId      String?
+  deliveryId  String?
+  reporterId  String
+  reportedId  String?
+  type        String   // safety, accident, dispute, fraud, other
+  severity    String   @default("low") // low, medium, high, critical
+  description String
+  status      String   @default("open") // open, investigating, resolved, closed
+  resolution  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ============ NOTIFICATIONS ============
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  message   String
+  type      String   @default("system") // ride, delivery, wallet, promo, system, safety
+  status    String   @default("unread") // unread, read, archived
+  data      String?  // JSON string for extra data
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// ============ INTERCITY RIDES ============
+
+model IntercityRide {
+  id              String    @id @default(cuid())
+  passengerId     String
+  status          String    @default("pending") // pending, confirmed, boarding, in_progress, completed, cancelled
+
+  departureCity   String
+  arrivalCity     String
+
+  pickupAddress   String
+  pickupLat       Float
+  pickupLng       Float
+
+  dropoffAddress  String
+  dropoffLat      Float
+  dropoffLng      Float
+
+  vehicleType     String    @default("bus_shared") // bus_shared, car_shared, car_private
+  seats           Int       @default(1)
+  scheduledDate   DateTime
+
+  estimatedFare   Float
+  actualFare      Float?
+  distance        Float?    // in km
+  duration        Int?      // in minutes
+
+  startedAt       DateTime?
+  completedAt     DateTime?
+  cancelledAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  passenger       User      @relation("PassengerIntercity", fields: [passengerId], references: [id])
+
+  @@index([passengerId])
+  @@index([status])
+  @@index([departureCity])
+  @@index([arrivalCity])
+  @@index([scheduledDate])
+}
+
+// ============ SCHOOL TRANSPORT ============
+
+model SchoolTransport {
+  id              String   @id @default(cuid())
+  parentId        String
+  childName       String
+  schoolName      String
+
+  homeAddress     String
+  homeLat         Float
+  homeLng         Float
+  homeZone        String
+
+  schoolAddress   String
+  schoolLat       Float
+  schoolLng       Float
+  schoolZone      String
+
+  schedule        String   @default("both") // morning, afternoon, both
+  packageType     String   @default("monthly") // monthly, quarterly, yearly
+
+  price           Float
+  status          String   @default("active") // active, paused, expired, cancelled
+
+  startsAt        DateTime @default(now())
+  expiresAt       DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  parent          User     @relation("ParentSchoolTransport", fields: [parentId], references: [id])
+
+  @@index([parentId])
+  @@index([status])
+  @@index([schedule])
+}
