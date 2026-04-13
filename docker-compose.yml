@@ -1,0 +1,29 @@
+version: "3.8"
+
+services:
+  mova-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mova-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=file:/app/db/custom.db
+      - HOSTNAME=0.0.0.0
+      - PORT=3000
+    volumes:
+      # Persist the SQLite database
+      - mova-db:/app/db
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  mova-db:
+    driver: local

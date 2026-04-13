@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: mova-app
+    runtime: docker
+    plan: free
+    repo: https://github.com/skaba89/mova-app.git
+    branch: main
+    dockerContext: .
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        value: file:/app/db/custom.db
+      - key: HOSTNAME
+        value: 0.0.0.0
+      - key: PORT
+        value: 3000
