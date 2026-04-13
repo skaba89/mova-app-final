@@ -87,7 +87,15 @@ export async function GET(
 
     // Verification des droits : passager, chauffeur ou admin
     const isPassenger = ride.passengerId === auth.id;
-    const isDriver = ride.driverProfileId === auth.id;
+    // Le chauffeur est identifie par son DriverProfile, pas par son User ID directement
+    let isDriver = false;
+    if (ride.driverProfileId) {
+      const driverProfile = await db.driverProfile.findUnique({
+        where: { id: ride.driverProfileId },
+        select: { userId: true },
+      });
+      isDriver = driverProfile?.userId === auth.id;
+    }
     const isAdmin = auth.role === 'admin';
 
     if (!isPassenger && !isDriver && !isAdmin) {
@@ -154,7 +162,15 @@ export async function PATCH(
 
     // Verification des droits
     const isPassenger = existingRide.passengerId === auth.id;
-    const isDriver = existingRide.driverProfileId === auth.id;
+    // Le chauffeur est identifie par son DriverProfile, pas par son User ID directement
+    let isDriver = false;
+    if (existingRide.driverProfileId) {
+      const driverProfile = await db.driverProfile.findUnique({
+        where: { id: existingRide.driverProfileId },
+        select: { userId: true },
+      });
+      isDriver = driverProfile?.userId === auth.id;
+    }
     const isAdmin = auth.role === 'admin';
 
     if (!isPassenger && !isDriver && !isAdmin) {
@@ -192,7 +208,17 @@ export async function PATCH(
             { status: 403 }
           );
         }
-        updateData.driverProfileId = auth.id;
+        // Trouver le DriverProfile du chauffeur et l'assigner
+        const driverProfile = await db.driverProfile.findUnique({
+          where: { userId: auth.id },
+        });
+        if (!driverProfile) {
+          return NextResponse.json(
+            { success: false, error: 'Profil chauffeur non trouve. Veuillez completer votre inscription chauffeur.' },
+            { status: 400 }
+          );
+        }
+        updateData.driverProfileId = driverProfile.id;
         updateData.status = 'accepted';
         updateData.acceptedAt = new Date();
       }

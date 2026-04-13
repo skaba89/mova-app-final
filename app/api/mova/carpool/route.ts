@@ -9,9 +9,11 @@ const createCarpoolSchema = z.object({
   pickupAddress: z.string().min(1, "L'adresse de depart est requise"),
   pickupLat: z.number(),
   pickupLng: z.number(),
+  pickupZone: z.string().min(1, 'La zone de depart est requise'),
   dropoffAddress: z.string().min(1, "L'adresse de destination est requise"),
   dropoffLat: z.number(),
   dropoffLng: z.number(),
+  dropoffZone: z.string().min(1, 'La zone de destination est requise'),
   seats: z.number().int().min(1).max(4).optional().default(1),
   departureTime: z.string().min(1, "L'heure de depart est requise"),
 })
@@ -140,7 +142,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Calculer le tarif estime avec le type clando
-    const estimatedFare = getFare('Matam', 'Kaloum', 'clando') // Tarif de base
+    const estimatedFare = getFare(data.pickupZone, data.dropoffZone, 'clando')
     const otp = generateOTP()
 
     // Creer un trajet programmee avec les metadonnees covoiturage
@@ -151,9 +153,11 @@ export async function POST(request: NextRequest) {
         pickupAddress: data.pickupAddress,
         pickupLat: data.pickupLat,
         pickupLng: data.pickupLng,
+        pickupZone: data.pickupZone,
         dropoffAddress: data.dropoffAddress,
         dropoffLat: data.dropoffLat,
         dropoffLng: data.dropoffLng,
+        dropoffZone: data.dropoffZone,
         estimatedFare,
         paymentMethod: 'cash',
         scheduledAt: departureDate,

@@ -30,7 +30,10 @@ export async function GET(request: NextRequest) {
     const skip = (page - 1) * limit
     const status = searchParams.get('status')
 
-    const where: Record<string, unknown> = {}
+    // Filtrer par les comptes auxquels l'utilisateur appartient
+    const where: Record<string, unknown> = {
+      employees: { some: { userId: auth.id } },
+    }
     if (status) {
       const statuses = status.split(',').map(s => s.trim()).filter(Boolean)
       if (statuses.length === 1) {

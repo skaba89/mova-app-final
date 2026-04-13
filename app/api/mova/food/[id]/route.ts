@@ -168,6 +168,25 @@ export async function PATCH(
       )
     }
 
+    // Verification des droits : client, restaurant, chauffeur ou admin
+    const isCustomer = order.customerId === auth.id
+    const isRestaurantOwner = order.restaurantId && auth.role === 'restaurant'
+    let isDriver = false
+    if (order.driverProfileId) {
+      const driverProfile = await db.driverProfile.findUnique({
+        where: { id: order.driverProfileId },
+        select: { userId: true },
+      })
+      isDriver = driverProfile?.userId === auth.id
+    }
+    const isAdmin = auth.role === 'admin'
+    if (!isCustomer && !isRestaurantOwner && !isDriver && !isAdmin) {
+      return NextResponse.json(
+        { success: false, error: 'Acces refuse a cette commande' },
+        { status: 403 }
+      )
+    }
+
     // Verifier que la commande n'est pas dans un etat terminal
     if (TERMINAL_STATES.has(order.status)) {
       return NextResponse.json(
@@ -213,14 +232,38 @@ export async function PATCH(
       }
     }
 
+    // Donnees de mise a jour
+    const updateData: Record<string, unknown> = {
+      status,
+      ...(status === 'cancelled' ? { cancelledAt: new Date() } : {}),
+    }
+
+    // Assigner le chauffeur si la commande est preparee et prete a etre recuperee
+    if (status === 'picked_up' && !order.driverProfileId) {
+      const driverProfile = await db.driverProfile.findUnique({
+        where: { userId: auth.id },
+      })
+      if (!driverProfile) {
+        return NextResponse.json(
+          { success: false, error: 'Profil chauffeur non trouve' },
+          { status: 400 }
+        )
+      }
+      updateData.driverProfileId = driverProfile.id
+    }
+
+    // Calculer le temps de livraison reel
+    if (status === 'delivered') {
+      const actualMinutes = order.createdAt
+        ? Math.round((Date.now() - order.createdAt.getTime()) / 60000)
+        : null
+      updateData.actualDeliveryTime = actualMinutes
+    }
+
     // Mettre a jour la commande
     const updatedOrder = await db.foodOrder.update({
       where: { id },
-      data: {
-        status,
-        ...(status === 'delivered' ? { actualDeliveryTime: 0 } : {}),
-        ...(status === 'cancelled' ? { cancelledAt: new Date() } : {}),
-      },
+      data: updateData,
       include: {
         restaurant: {
           select: {

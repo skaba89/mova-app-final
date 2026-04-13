@@ -145,6 +145,24 @@ export async function PATCH(
       )
     }
 
+    // Verification des droits : client, coursier ou admin
+    const isCustomer = delivery.customerId === auth.id
+    let isCourier = false
+    if (delivery.courierId) {
+      const courierProfile = await db.driverProfile.findUnique({
+        where: { id: delivery.courierId },
+        select: { userId: true },
+      })
+      isCourier = courierProfile?.userId === auth.id
+    }
+    const isAdmin = auth.role === 'admin'
+    if (!isCustomer && !isCourier && !isAdmin) {
+      return NextResponse.json(
+        { success: false, error: 'Acces refuse a cette livraison' },
+        { status: 403 }
+      )
+    }
+
     // Verifier que la livraison n'est pas dans un etat terminal
     if (TERMINAL_STATES.has(delivery.status)) {
       return NextResponse.json(
@@ -178,10 +196,33 @@ export async function PATCH(
       )
     }
 
+    // Donnees de mise a jour
+    const updateData: Record<string, unknown> = { status }
+
+    // Assigner le coursier si la livraison est acceptee
+    if (status === 'accepted' && !delivery.courierId) {
+      const courierProfile = await db.driverProfile.findUnique({
+        where: { userId: auth.id },
+      })
+      if (!courierProfile) {
+        return NextResponse.json(
+          { success: false, error: 'Profil coursier non trouve' },
+          { status: 400 }
+        )
+      }
+      if (!isCourier && !isAdmin) {
+        return NextResponse.json(
+          { success: false, error: 'Seul un coursier peut accepter une livraison' },
+          { status: 403 }
+        )
+      }
+      updateData.courierId = courierProfile.id
+    }
+
     // Mettre a jour la livraison
     const updatedDelivery = await db.delivery.update({
       where: { id },
-      data: { status },
+      data: updateData,
       include: {
         courier: {
           select: {

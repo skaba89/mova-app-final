@@ -173,6 +173,30 @@ export const VEHICLE_FARES: Record<string, VehicleFare> = {
     perKm: 200,
     minimumFare: 1500,
   },
+  // Voiture standard (alias auto/taxi)
+  standard: {
+    basePrice: 5000,
+    perKm: 800,
+    minimumFare: 5000,
+  },
+  // Bicyclette
+  bicycle: {
+    basePrice: 1000,
+    perKm: 200,
+    minimumFare: 1000,
+  },
+  // Camion
+  camion: {
+    basePrice: 15000,
+    perKm: 2000,
+    minimumFare: 15000,
+  },
+  // Pickup
+  pickup: {
+    basePrice: 10000,
+    perKm: 1500,
+    minimumFare: 10000,
+  },
 }
 
 // Recuperer la distance entre deux zones

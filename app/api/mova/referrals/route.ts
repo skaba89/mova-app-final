@@ -178,10 +178,14 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    return NextResponse.json(
-      { success: false, error: 'Ce code de parrainage est deja utilise' },
-      { status: 400 }
-    )
+    // Verifier qu'un autre utilisateur n'a pas deja ete parraine avec ce code
+    // (le code peut etre utilise par plusieurs filleuls differents)
+    if (referralRecord.referredId !== auth.id) {
+      return NextResponse.json(
+        { success: false, error: 'Ce code de parrainage a deja ete utilise' },
+        { status: 400 }
+      )
+    }
   } catch (error) {
     console.error('[REFERRALS] Erreur lors de l\'application:', error)
     return NextResponse.json(

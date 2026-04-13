@@ -11,7 +11,15 @@ export async function PATCH(
     const auth = await requireAuth(request);
     if (auth instanceof NextResponse) return auth;
     const { id } = await params;
-    const body = await request.json();
+    let body: { isRead?: boolean };
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { success: false, error: 'Corps de requete invalide' },
+        { status: 400 }
+      );
+    }
 
     // Verification que le corps contient isRead: true
     if (body.isRead !== true) {
