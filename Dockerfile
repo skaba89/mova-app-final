@@ -10,7 +10,7 @@ RUN bun install --frozen-lockfile
 # Copy source
 COPY . .
 
-# Generate Prisma client (use prisma-schema directory)
+# Generate Prisma client with library engine (no native binary needed)
 RUN bunx prisma generate --schema=prisma-schema/schema.prisma
 
 # Create SQLite database with all tables during build
@@ -26,13 +26,12 @@ ENV NODE_ENV=production
 RUN bun run build
 
 # ─── Stage 2: Production ──────────────────────────────────────────────────
-FROM node:20-bookworm-slim AS production
+FROM node:20-slim AS production
 
 WORKDIR /app
 
-# Install runtime dependencies: OpenSSL (required by Prisma), SQLite3, dumb-init, su-exec
+# Install runtime dependencies: SQLite3, dumb-init
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    openssl libssl3 \
     dumb-init wget sqlite3 su-exec \
     && rm -rf /var/lib/apt/lists/*
 
@@ -49,7 +48,7 @@ COPY --from=builder /app/public ./public
 # Copy Prisma schema
 COPY --from=builder /app/prisma-schema ./prisma-schema
 
-# Copy Prisma client (runtime)
+# Copy Prisma client (runtime) - library engine, no binary needed
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma/client ./node_modules/@prisma/client
 
@@ -60,7 +59,7 @@ COPY --from=builder /app/db/custom.db /app/db-template/custom.db
 RUN mkdir -p /app/db /app/db-template && \
     chown -R mova:mova /app/db /app/db-template /app/prisma-schema /app/node_modules
 
-# Set environment with fallback JWT_SECRET
+# Set environment
 ENV NODE_ENV=production
 ENV HOSTNAME=0.0.0.0
 ENV PORT=3000
@@ -73,4 +72,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
   CMD wget -qO- http://localhost:3000/ || exit 1
 
 ENTRYPOINT ["dumb-init", "--"]
-CMD ["sh", "-c", "chown -R mova:mova /app/db 2>/dev/null; mkdir -p /app/db && if [ ! -f /app/db/custom.db ]; then echo 'Initializing database from template...' && cp /app/db-template/custom.db /app/db/custom.db && chown mova:mova /app/db/custom.db && echo 'Database initialized.'; else echo 'Database already exists, skipping init.'; fi && echo 'Starting Next.js on port 3000...' && exec su-exec mova node /app/server.js"]
+CMD ["sh", "-c", "chown -R mova:mova /app/db 2>/dev/null; mkdir -p /app/db && if [ ! -f /app/db/custom.db ]; then cp /app/db-template/custom.db /app/db/custom.db && chown mova:mova /app/db/custom.db; fi && exec su-exec mova node /app/server.js"]
