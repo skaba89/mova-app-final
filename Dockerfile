@@ -26,12 +26,12 @@ ENV NODE_ENV=production
 RUN bun run build
 
 # ─── Stage 2: Production ──────────────────────────────────────────────────
-FROM node:20-slim AS production
+FROM node:20-bookworm-slim AS production
 
 WORKDIR /app
 
 # Install dumb-init for signal handling + SQLite3
-RUN apt-get update && apt-get install -y --no-install-recommends dumb-init wget sqlite3 && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends dumb-init wget sqlite3 su-exec && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
 RUN groupadd -r mova && useradd -r -g mova -d /app mova
@@ -64,13 +64,10 @@ ENV PORT=3000
 ENV DATABASE_URL=file:/app/db/custom.db
 ENV JWT_SECRET=mova-super-secret-jwt-key-change-in-production-2024
 
-# Switch to non-root user
-USER mova
-
 EXPOSE 3000
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
   CMD wget -qO- http://localhost:3000/ || exit 1
 
 ENTRYPOINT ["dumb-init", "--"]
-CMD ["sh", "-c", "mkdir -p /app/db && if [ ! -f /app/db/custom.db ]; then echo 'Initializing database from template...' && cp /app/db-template/custom.db /app/db/custom.db && echo 'Database initialized.'; else echo 'Database already exists, skipping init.'; fi && echo 'Starting Next.js on port 3000...' && exec node /app/server.js"]
+CMD ["sh", "-c", "chown -R mova:mova /app/db 2>/dev/null; mkdir -p /app/db && if [ ! -f /app/db/custom.db ]; then echo 'Initializing database from template...' && cp /app/db-template/custom.db /app/db/custom.db && chown mova:mova /app/db/custom.db && echo 'Database initialized.'; else echo 'Database already exists, skipping init.'; fi && echo 'Starting Next.js on port 3000...' && exec su-exec mova node /app/server.js"]
