@@ -44,6 +44,8 @@
     "test",
     "prompt",
     "claude",
-    "download"
+    "download",
+    "prisma",
+    "scripts"
   ]
 }
