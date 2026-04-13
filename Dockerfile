@@ -32,7 +32,7 @@ WORKDIR /app
 
 # Install runtime dependencies: SQLite3, dumb-init
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    dumb-init wget sqlite3 su-exec \
+    dumb-init wget sqlite3 gosu \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
@@ -72,4 +72,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
   CMD wget -qO- http://localhost:3000/ || exit 1
 
 ENTRYPOINT ["dumb-init", "--"]
-CMD ["sh", "-c", "chown -R mova:mova /app/db 2>/dev/null; mkdir -p /app/db && if [ ! -f /app/db/custom.db ]; then cp /app/db-template/custom.db /app/db/custom.db && chown mova:mova /app/db/custom.db; fi && exec su-exec mova node /app/server.js"]
+CMD ["sh", "-c", "chown -R mova:mova /app/db 2>/dev/null; mkdir -p /app/db && if [ ! -f /app/db/custom.db ]; then cp /app/db-template/custom.db /app/db/custom.db && chown mova:mova /app/db/custom.db; fi && exec gosu mova node /app/server.js"]
