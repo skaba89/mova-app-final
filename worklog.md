@@ -48,3 +48,21 @@ Stage Summary:
 - 6 bugs critiques corriges sans refonte globale
 - ESLint: 0 erreurs
 - Git commit: 43c2477 (pousse sur GitHub)
+
+---
+Task ID: migration-plan
+Agent: main (Super Z)
+Task: Generation du plan de migration module par module (6 modules MOVA)
+
+Work Log:
+- Inventaire complet du codebase : 35 routes API, 20 vues frontend, 9 lib, 35 modeles Prisma
+- Analyse detaillee de chaque module : Ride, Food/Grocery, Courier/Delivery, Portails Partenaires, App Chauffeur/Coursier, Paiements/Wallet/Promos/Support/Safety/Analytics
+- Pour chaque module : inventaire fichiers, risques classifies (Critique/Eleve/Moyen/Faible), strategie de migration, plan de non-regression
+- Generation du document DOCX avec cover R1 (Graphite Orange), TOC, tables detaillees
+- Postcheck : 7/9 passes, 0 erreurs, 2 warnings mineurs
+
+Stage Summary:
+- Document : /home/z/my-project/download/MOVA_Plan_Migration_Modules.docx
+- 6 modules analyses avec tables de risques et plans de non-regression
+- Matrice de dependance inter-modules et roadmap globale en 4 phases
+- 5 principes directeurs : precaution, tracabilite, reversibilite, validation continue, communication
