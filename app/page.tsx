@@ -11,6 +11,16 @@ import { FoodView } from '@/components/mova/food-view'
 import { RestaurantView } from '@/components/mova/restaurant-view'
 import { FoodCartView } from '@/components/mova/foodcart-view'
 import { FoodTrackingView } from '@/components/mova/foodtracking-view'
+import { DeliveriesView } from '@/components/mova/deliveries-view'
+import { CarpoolView } from '@/components/mova/carpool-view'
+import { BookingsView } from '@/components/mova/bookings-view'
+import { LoyaltyView } from '@/components/mova/loyalty-view'
+import { PromotionsView } from '@/components/mova/promotions-view'
+import { ReferralsView } from '@/components/mova/referrals-view'
+import { IncidentsView } from '@/components/mova/incidents-view'
+import { AdminMonitoringView } from '@/components/mova/admin-monitoring-view'
+import { MotoView } from '@/components/mova/moto-view'
+import { BusinessView } from '@/components/mova/business-view'
 import { Construction, ArrowLeft } from 'lucide-react'
 
 /**
@@ -92,16 +102,16 @@ export default function MovaPage() {
       return <FoodTrackingView />
 
     case 'deliveries':
-      return <PlaceholderView viewName="Livraison" />
+      return <DeliveriesView />
 
     case 'bookings':
-      return <PlaceholderView viewName="Reservations" />
+      return <BookingsView />
 
     case 'carpool':
-      return <PlaceholderView viewName="Covoiturage" />
+      return <CarpoolView />
 
     case 'moto':
-      return <PlaceholderView viewName="Moto" />
+      return <MotoView />
 
     case 'navigation':
       return <PlaceholderView viewName="Navigation" />
@@ -113,25 +123,25 @@ export default function MovaPage() {
       return <PlaceholderView viewName="Location voiture" />
 
     case 'loyalty':
-      return <PlaceholderView viewName="Fidelite" />
+      return <LoyaltyView />
 
     case 'promotions':
-      return <PlaceholderView viewName="Promotions" />
+      return <PromotionsView />
 
     case 'referrals':
-      return <PlaceholderView viewName="Parrainage" />
+      return <ReferralsView />
 
     case 'admin-monitoring':
-      return <PlaceholderView viewName="Administration" />
+      return <AdminMonitoringView />
 
     case 'assistant':
       return <PlaceholderView viewName="Assistant" />
 
     case 'incidents':
-      return <PlaceholderView viewName="SOS / Incidents" />
+      return <IncidentsView />
 
     case 'business':
-      return <PlaceholderView viewName="Espace professionnel" />
+      return <BusinessView />
 
     default:
       return <UnavailableView view={currentView} />

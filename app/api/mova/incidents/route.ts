@@ -17,11 +17,19 @@ const createIncidentSchema = z.object({
   relatedUserId: z.string().optional(),
 })
 
-// GET /api/mova/incidents - Lister les incidents (admin uniquement)
+// GET /api/mova/incidents - Lister les incidents (admin: tous, user: ses propres)
 export async function GET(request: NextRequest) {
   try {
-    const auth = await requireAdmin(request)
+    const auth = await requireAuth(request)
     if (auth instanceof NextResponse) return auth
+
+    const isAdmin = auth.role === 'admin'
+
+    // Si non admin, filtrer par reporterId
+    const where: Record<string, unknown> = {}
+    if (!isAdmin) {
+      where.reporterId = auth.id
+    }
 
     const { searchParams } = new URL(request.url)
     const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10))
@@ -30,8 +38,6 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status')
     const severity = searchParams.get('severity')
     const type = searchParams.get('type')
-
-    const where: Record<string, unknown> = {}
 
     if (status) {
       const statuses = status.split(',').map(s => s.trim()).filter(Boolean)

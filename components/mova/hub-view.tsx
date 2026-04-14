@@ -203,7 +203,7 @@ const BOTTOM_TABS: BottomNavTab[] = [
  * Affiche la grille de services et la navigation inferieure.
  */
 export function HubView() {
-  const { user, setCurrentView, logout } = useMovaStore()
+  const { user, setCurrentView, currentView, logout } = useMovaStore()
 
   // Obtenir le prenom de l'utilisateur
   const firstName = user?.name?.split(' ')[0] || 'Bienvenue'
@@ -304,7 +304,7 @@ export function HubView() {
         <div className="flex items-center justify-around max-w-lg mx-auto py-2">
           {BOTTOM_TABS.map((tab) => {
             const Icon = tab.icon
-            const isActive = tab.view === 'hub' // Le hub est toujours l'onglet actif ici
+            const isActive = tab.view === currentView || (tab.view === 'hub' && currentView === 'hub')
             return (
               <button
                 key={tab.id}
