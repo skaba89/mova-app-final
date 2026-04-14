@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { requireAuth, AuthError } from '@/lib/mova/auth-middleware';
 import { estimateFare } from '@/lib/mova/zone-distances';
+import { rateLimiter } from '@/lib/mova/rate-limit';
+import { logAction } from '@/lib/mova/audit-logger';
 import { z } from 'zod/v4';
 
 const createRideSchema = z.object({
@@ -201,6 +203,8 @@ export async function POST(request: NextRequest) {
     });
 
     const convertedRide = convertRideDecimals(ride as unknown as Record<string, unknown>);
+
+    await logAction({ userId: auth.id, action: 'ride_created', resource: 'ride', resourceId: ride.id, details: { pickup: data.pickupZone, dropoff: data.dropoffZone, vehicleType: data.vehicleType, paymentMethod: data.paymentMethod } });
 
     return NextResponse.json(
       { success: true, data: { ride: convertedRide } },

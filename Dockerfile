@@ -12,7 +12,7 @@ RUN bunx prisma generate --schema=prisma-schema/schema.prisma
 
 RUN mkdir -p /app/db && \
     DATABASE_URL="file:/app/db/custom.db" \
-    bunx prisma db push --schema=prisma-schema/schema.prisma --skip-generate --accept-data-loss 2>&1 && \
+    bunx prisma db push --schema=prisma-schema/schema.prisma --skip-generate 2>&1 && \
     echo "=== DB tables created ==="
 
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -39,11 +39,12 @@ ENV NODE_ENV=production
 ENV HOSTNAME=0.0.0.0
 ENV PORT=3000
 ENV DATABASE_URL=file:/app/db/custom.db
-ENV JWT_SECRET=mova-super-secret-key-2024
+# JWT_SECRET doit etre injecte via docker-compose, docker run -e, ou un secret Docker
+# ENV JWT_SECRET=change-me-in-production
 
 EXPOSE 3000
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-  CMD curl -sf http://localhost:3000/ || exit 1
+  CMD node -e "require('http').get('http://localhost:3000/api/mova/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"
 
 CMD sh -c "mkdir -p /app/db && if [ ! -f /app/db/custom.db ]; then cp /app/db-template/custom.db /app/db/custom.db && echo 'DB initialized'; fi && node /app/server.js"

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { requireAuth, AuthError } from '@/lib/mova/auth-middleware';
+import { rateLimiter } from '@/lib/mova/rate-limit';
+import { logAction } from '@/lib/mova/audit-logger';
 import { z } from 'zod/v4';
 
 const transferSchema = z.object({
@@ -24,6 +26,16 @@ export async function POST(request: NextRequest) {
   try {
     const auth = await requireAuth(request);
     if (auth instanceof NextResponse) return auth;
+
+    // Rate limiting: 3 transferts par minute
+    const rateCheck = rateLimiter.checkRequest(`wallet_transfer:${auth.id}`, 3, 60_000);
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { success: false, error: 'Trop de transferts. Reessayez dans quelques instants.' },
+        { status: 429 }
+      );
+    }
+
     const body = await request.json();
 
     const parsed = transferSchema.safeParse(body);
@@ -150,6 +162,8 @@ export async function POST(request: NextRequest) {
 
       return { debitedWallet, creditedWallet, debitTransaction, creditTransaction };
     });
+
+    await logAction({ userId: fromUserId, action: 'wallet_transfer', resource: 'wallet', resourceId: fromWallet.id, details: { toUserId, amount } });
 
     const decimalFields = ['balance', 'amount'];
     const convertedDebited = convertDecimalFields(result.debitedWallet as unknown as Record<string, unknown>, decimalFields);

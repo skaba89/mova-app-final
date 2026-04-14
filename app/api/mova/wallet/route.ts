@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { requireAuth, AuthError } from '@/lib/mova/auth-middleware';
+import { rateLimiter } from '@/lib/mova/rate-limit';
+import { logAction } from '@/lib/mova/audit-logger';
 import { z } from 'zod/v4';
 
 const topUpSchema = z.object({
@@ -99,6 +101,16 @@ export async function POST(request: NextRequest) {
   try {
     const auth = await requireAuth(request);
     if (auth instanceof NextResponse) return auth;
+
+    // Rate limiting: 5 rechargements par minute
+    const rateCheck = rateLimiter.checkRequest(`wallet_topup:${auth.id}`, 5, 60_000);
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { success: false, error: 'Trop de tentatives de rechargement. Reessayez plus tard.' },
+        { status: 429 }
+      );
+    }
+
     const body = await request.json();
 
     const parsed = topUpSchema.safeParse(body);
@@ -126,6 +138,26 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // Verifier que le portefeuille n'est pas gele
+    if (wallet.isFrozen) {
+      return NextResponse.json(
+        { success: false, error: 'Votre portefeuille est gele. Contactez le support.' },
+        { status: 403 }
+      );
+    }
+
+    // Mode sandbox: simuler la verification paiement (production: integration Orange Money, MTN MoMo, Wave)
+    const isSandbox = process.env.NODE_ENV !== 'production';
+    const paymentRef = `PAY-${method.toUpperCase()}-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+    const paymentVerified = isSandbox; // En production, verifier via l'API du fournisseur
+
+    if (!paymentVerified) {
+      return NextResponse.json(
+        { success: false, error: 'Verification de paiement echouee. Veuillez reessayer.' },
+        { status: 402 }
+      );
+    }
+
     // Ajout des fonds avec une transaction atomique
     const updatedWallet = await db.$transaction(async (tx) => {
       // Crediter le portefeuille
@@ -143,19 +175,21 @@ export async function POST(request: NextRequest) {
           balanceBefore: wallet!.balance,
           balanceAfter: Number(wallet!.balance) + amount,
           reference: `WT-TOPUP-${Date.now()}`,
-          description: `Rechargement via ${method}`,
+          description: `Rechargement via ${method}${isSandbox ? ' (sandbox)' : ''}`,
         },
       });
 
       return incremented;
     });
 
+    await logAction({ userId: auth.id, action: 'wallet_topup', resource: 'wallet', resourceId: wallet.id, details: { amount, method, sandbox: isSandbox } });
+
     const decimalFields = ['balance', 'amount'];
     const converted = convertDecimalFields(updatedWallet as unknown as Record<string, unknown>, decimalFields);
 
     return NextResponse.json({
       success: true,
-      data: { wallet: converted },
+      data: { wallet: converted, sandbox: isSandbox },
     });
   } catch (error) {
     if (error instanceof AuthError) {

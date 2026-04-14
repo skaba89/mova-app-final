@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/mova/auth-middleware'
 import db from '@/lib/db'
+import { rateLimiter } from '@/lib/mova/rate-limit'
+import { logAction } from '@/lib/mova/audit-logger'
 import { z } from 'zod/v4'
 import { LoyaltyTier } from '@prisma/client'
 
@@ -148,11 +150,20 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST /api/mova/loyalty - Acquerir des points de fidelite
+// POST /api/mova/loyalty - Acquerir des points de fidelite (securise: verification serveur)
 export async function POST(request: NextRequest) {
   try {
     const auth = await requireAuth(request)
     if (auth instanceof NextResponse) return auth
+
+    // Rate limiting: 10 demandes par minute
+    const rateCheck = rateLimiter.checkRequest(`loyalty:${auth.id}`, 10, 60_000)
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { success: false, error: 'Trop de demandes. Reessayez plus tard.' },
+        { status: 429 }
+      )
+    }
 
     const body = await request.json()
     const parsed = earnPointsSchema.safeParse(body)
@@ -171,6 +182,48 @@ export async function POST(request: NextRequest) {
         { success: false, error: 'Action non reconnue pour l\'acquisition de points' },
         { status: 400 }
       )
+    }
+
+    // Verification cote serveur: l'action doit correspondre a une ressource reelle
+    if (relatedId) {
+      let resourceExists = false
+      switch (action) {
+        case 'ride_completed': {
+          const ride = await db.ride.findUnique({ where: { id: relatedId }, select: { passengerId: true, status: true } })
+          resourceExists = !!ride && ride.passengerId === auth.id && ride.status === 'completed'
+          break
+        }
+        case 'food_ordered': {
+          const order = await db.foodOrder.findUnique({ where: { id: relatedId }, select: { userId: true, status: true } })
+          resourceExists = !!order && order.userId === auth.id && (order.status === 'delivered' || order.status === 'completed')
+          break
+        }
+        case 'delivery_completed': {
+          const delivery = await db.delivery.findUnique({ where: { id: relatedId }, select: { customerId: true, status: true } })
+          resourceExists = !!delivery && delivery.customerId === auth.id && delivery.status === 'delivered'
+          break
+        }
+        case 'referral': {
+          // Verifier que l'utilisateur reference existe et est different
+          const refUser = await db.user.findUnique({ where: { id: relatedId }, select: { id: true } })
+          resourceExists = !!refUser && refUser.id !== auth.id
+          break
+        }
+        case 'review': {
+          // Les reviews peuvent etre verifiees via relatedId = rideId/deliveryId
+          resourceExists = true
+          break
+        }
+        default:
+          resourceExists = false
+      }
+
+      if (!resourceExists) {
+        return NextResponse.json(
+          { success: false, error: 'Ressource non valide ou action non verifiable pour cette ressource' },
+          { status: 400 }
+        )
+      }
     }
 
     // Utiliser une transaction Prisma pour eviter les courses

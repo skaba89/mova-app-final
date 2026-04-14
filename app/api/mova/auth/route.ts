@@ -3,10 +3,14 @@ import { SignJWT } from 'jose';
 import bcrypt from 'bcryptjs';
 import { db } from '@/lib/db';
 import { validateRequest, AuthError } from '@/lib/mova/auth-middleware';
+import { rateLimiter } from '@/lib/mova/rate-limit';
+import { logAction, logSecurityEvent } from '@/lib/mova/audit-logger';
 import { z } from 'zod/v4';
 
-// JWT_SECRET avec fallback (ne crash pas si absent)
-const JWT_SECRET = process.env.JWT_SECRET || 'mova-super-secret-jwt-key-change-in-production-2024';
+// JWT_SECRET - obligatoire en production, fallback en dev uniquement
+const JWT_SECRET = process.env.JWT_SECRET || (process.env.NODE_ENV === 'production'
+  ? (() => { throw new Error('JWT_SECRET obligatoire en production') })()
+  : 'mova-dev-secret-key-2024');
 
 const registerSchema = z.object({
   action: z.literal('register'),
@@ -40,6 +44,16 @@ async function generateToken(user: { id: string; email: string; role: string }):
 // POST /api/mova/auth
 export async function POST(request: NextRequest) {
   try {
+    // Rate limiting: 10 requetes par minute par IP
+    const clientIp = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || request.headers.get('x-real-ip') || 'unknown';
+    const rateCheck = rateLimiter.checkRequest(`auth:${clientIp}`, 10, 60_000);
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { success: false, error: 'Trop de tentatives. Reessayez dans quelques instants.', retryAfterMs: rateCheck.retryAfterMs },
+        { status: 429 }
+      );
+    }
+
     const body = await request.json();
     const parsed = authSchema.safeParse(body);
 
@@ -59,6 +73,7 @@ export async function POST(request: NextRequest) {
       });
 
       if (existingUser) {
+        await logSecurityEvent({ action: 'register_duplicate', resource: 'user', resourceId: data.email, details: { ip: clientIp } });
         return NextResponse.json(
           { success: false, error: 'Un compte avec cet email existe deja' },
           { status: 409 }
@@ -88,6 +103,8 @@ export async function POST(request: NextRequest) {
 
       const token = await generateToken(user);
 
+      await logAction({ userId: user.id, action: 'register', resource: 'user', resourceId: user.id, details: { email: data.email, ip: clientIp } });
+
       return NextResponse.json({
         success: true,
         data: { user, token },
@@ -111,6 +128,7 @@ export async function POST(request: NextRequest) {
       });
 
       if (!user) {
+        await logSecurityEvent({ action: 'login_failed', resource: 'auth', details: { email: data.email, reason: 'user_not_found', ip: clientIp } });
         return NextResponse.json(
           { success: false, error: 'Email ou mot de passe incorrect' },
           { status: 401 }
@@ -118,6 +136,7 @@ export async function POST(request: NextRequest) {
       }
 
       if (user.status === 'suspended' || user.status === 'banned') {
+        await logSecurityEvent({ action: 'login_blocked', resource: 'auth', resourceId: user.id, details: { email: data.email, status: user.status, ip: clientIp } });
         return NextResponse.json(
           { success: false, error: 'Compte desactive. Contactez le support.' },
           { status: 403 }
@@ -133,6 +152,7 @@ export async function POST(request: NextRequest) {
 
       const isValid = await bcrypt.compare(data.password, user.password);
       if (!isValid) {
+        await logSecurityEvent({ action: 'login_failed', resource: 'auth', resourceId: user.id, details: { email: data.email, reason: 'wrong_password', ip: clientIp } });
         return NextResponse.json(
           { success: false, error: 'Email ou mot de passe incorrect' },
           { status: 401 }
@@ -141,6 +161,8 @@ export async function POST(request: NextRequest) {
 
       const { password: _, ...userWithoutPassword } = user;
       const token = await generateToken(userWithoutPassword);
+
+      await logAction({ userId: user.id, action: 'login', resource: 'auth', resourceId: user.id, details: { email: data.email, ip: clientIp } });
 
       return NextResponse.json({
         success: true,

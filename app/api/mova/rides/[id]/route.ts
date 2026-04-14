@@ -249,7 +249,14 @@ export async function PATCH(
             { status: 400 }
           );
         }
-        if (data.otp && data.otp !== existingRide.otp) {
+        // OTP obligatoire pour demarrer la course (securite anti-fraude)
+        if (!data.otp) {
+          return NextResponse.json(
+            { success: false, error: 'Code OTP requis pour demarrer la course' },
+            { status: 400 }
+          );
+        }
+        if (data.otp !== existingRide.otp) {
           return NextResponse.json(
             { success: false, error: 'Code OTP invalide' },
             { status: 400 }

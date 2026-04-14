@@ -21,6 +21,9 @@ import { IncidentsView } from '@/components/mova/incidents-view'
 import { AdminMonitoringView } from '@/components/mova/admin-monitoring-view'
 import { MotoView } from '@/components/mova/moto-view'
 import { BusinessView } from '@/components/mova/business-view'
+import { AssistantView } from '@/components/mova/assistant-view'
+import { NavigationView } from '@/components/mova/navigation-view'
+import { TransferView } from '@/components/mova/transfer-view'
 import { Construction, ArrowLeft } from 'lucide-react'
 
 /**
@@ -114,10 +117,10 @@ export default function MovaPage() {
       return <MotoView />
 
     case 'navigation':
-      return <PlaceholderView viewName="Navigation" />
+      return <NavigationView />
 
     case 'transfer':
-      return <PlaceholderView viewName="Transfert" />
+      return <TransferView />
 
     case 'carrental':
       return <PlaceholderView viewName="Location voiture" />
@@ -135,7 +138,7 @@ export default function MovaPage() {
       return <AdminMonitoringView />
 
     case 'assistant':
-      return <PlaceholderView viewName="Assistant" />
+      return <AssistantView />
 
     case 'incidents':
       return <IncidentsView />

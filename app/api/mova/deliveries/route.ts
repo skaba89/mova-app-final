@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/mova/auth-middleware'
 import db from '@/lib/db'
-import { z } from 'zod/v4'
 import { getDistance, getFare } from '@/lib/mova/zone-distances'
+import { rateLimiter } from '@/lib/mova/rate-limit'
+import { logAction } from '@/lib/mova/audit-logger'
+import { z } from 'zod/v4'
 
 // Schema de validation pour la creation d'une livraison
 const createDeliverySchema = z.object({
@@ -189,6 +191,8 @@ export async function POST(request: NextRequest) {
       dropoffLng: num(delivery.dropoffLng),
       packageWeight: num(delivery.packageWeight),
     }
+
+    await logAction({ userId: auth.id, action: 'delivery_created', resource: 'delivery', resourceId: delivery.id, details: { pickup: data.pickupZone, dropoff: data.dropoffZone, packageType: data.packageType, paymentMethod: data.paymentMethod } })
 
     return NextResponse.json(
       { success: true, data: { delivery: convertedDelivery } },

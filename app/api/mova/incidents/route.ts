@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireAuth, requireAdmin } from '@/lib/mova/auth-middleware'
+import { requireAuth } from '@/lib/mova/auth-middleware'
 import db from '@/lib/db'
+import { logAction } from '@/lib/mova/audit-logger'
 import { z } from 'zod/v4'
 
 // Types d'incidents autorises
@@ -161,6 +162,8 @@ export async function POST(request: NextRequest) {
         },
       },
     })
+
+    await logAction({ userId: auth.id, action: 'incident_reported', resource: 'incident', resourceId: incident.id, severity: data.severity, details: { type: data.type, rideId: data.rideId, deliveryId: data.deliveryId } })
 
     return NextResponse.json(
       {
